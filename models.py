@@ -659,7 +659,7 @@ def insert_initial_models():
         ),
         Model(
             id="gradium",
-            name="Gradium",
+            name="Gradium TTS",
             model_type=ModelType.TTS,
             is_open=False,
             is_active=True,
@@ -667,7 +667,7 @@ def insert_initial_models():
         ),
         Model(
             id="typecast",
-            name="Typecast",
+            name="Typecast SSFM 3.0",
             model_type=ModelType.TTS,
             is_open=False,
             is_active=True,
