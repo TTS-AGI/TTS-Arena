@@ -75,6 +75,14 @@ model_mapping = {
         "provider": "deepdub",
         "model": "dd-etts-3.2",
     },
+    "gradium": {
+        "provider": "gradium",
+        "model": "gradium",
+    },
+    "typecast": {
+        "provider": "typecast",
+        "model": "typecast",
+    },
     "megatts3": {
         "provider": "megatts3",
         "model": "megatts3",
@@ -94,6 +102,14 @@ model_mapping = {
     "nls-pre-v1": {
         "provider": "nls",
         "model": "nls-1",
+    },
+    "luck-dolphin": {
+        "provider": "nls",
+        "model": "tts-arena-1",
+    },
+    "luck-dolphin-turbo": {
+        "provider": "nls",
+        "model": "tts-arena-2",
     },
     "chatterbox": {
         "provider": "chatterbox",
