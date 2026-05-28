@@ -728,6 +728,14 @@ def insert_initial_models():
             model_url="https://inworld.ai/tts",
         ),
         Model(
+            id="inworld-max-1.5",
+            name="Inworld TTS 1.5 MAX",
+            model_type=ModelType.TTS,
+            is_open=False,
+            is_active=True,
+            model_url="https://inworld.ai/tts",
+        ),
+        Model(
             id="async-1",
             name="CastleFlow v1.0",
             model_type=ModelType.TTS,
