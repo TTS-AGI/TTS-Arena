@@ -1,0 +1,19 @@
+{
+  "name": "@ttsa/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "lint": "echo 'no lint for shared (covered by root prettier)'",
+    "build": "echo 'shared is consumed as source; no build step'"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}
