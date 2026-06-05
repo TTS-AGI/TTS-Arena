@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+#
+# Combined image for the Hugging Face Space. One container runs three processes
+# under supervisord:
+#   - postgres   (data on /data/pgdata, the persistent bucket)
+#   - router     (:8080, internal)
+#   - web        (:7860, the port HF exposes)
+#
+# Generated audio is logged to /audio (the second persistent bucket).
+FROM oven/bun:1.1.42-debian AS base
+WORKDIR /app
+
+# ── deps ──
+FROM base AS deps
+COPY package.json bun.lock ./
+COPY apps/web/package.json apps/web/package.json
+COPY apps/router/package.json apps/router/package.json
+COPY packages/shared/package.json packages/shared/package.json
+COPY packages/provider-sdk/package.json packages/provider-sdk/package.json
+COPY packages/providers/elevenlabs/package.json packages/providers/elevenlabs/package.json
+COPY packages/providers/minimax/package.json packages/providers/minimax/package.json
+RUN bun install
+
+# ── build the web app ──
+FROM base AS build
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN cd apps/web && bun run build
+
+# ── runtime ──
+FROM base AS runtime
+ENV NODE_ENV=production
+
+# System deps: postgres, supervisord, ffmpeg (router audio normalization).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+       postgresql postgresql-contrib supervisor ffmpeg gosu \
+  && rm -rf /var/lib/apt/lists/*
+
+# App: built web + full source for the router (run from source via bun).
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/apps/web/.next/standalone ./standalone
+COPY --from=build /app/apps/web/.next/static ./standalone/apps/web/.next/static
+COPY --from=build /app/apps/web/public ./standalone/apps/web/public
+COPY apps/router ./apps/router
+COPY apps/web/drizzle ./apps/web/drizzle
+COPY apps/web/drizzle.config.ts ./apps/web/drizzle.config.ts
+COPY apps/web/src/server/db ./apps/web/src/server/db
+COPY packages ./packages
+
+# The prompt corpus (Git LFS). Baked into the image so it ships with the deploy
+# (the source URL is not guaranteed to stay up). PROMPTS_FILE points the app at
+# it; the loader memory-maps it via a line-offset index, never loading it whole.
+COPY apps/web/data/combined_prompts.txt /app/data/combined_prompts.txt
+ENV PROMPTS_FILE=/app/data/combined_prompts.txt
+
+# Entrypoint + supervisor config.
+COPY deploy/space/entrypoint.sh /entrypoint.sh
+COPY deploy/space/supervisord.conf /etc/supervisor/conf.d/tts-arena.conf
+RUN chmod +x /entrypoint.sh
+
+# HF mounts /data and /audio as persistent buckets; create mountpoints.
+RUN mkdir -p /data /audio
+
+EXPOSE 7860
+ENTRYPOINT ["/entrypoint.sh"]

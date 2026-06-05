@@ -1,0 +1,82 @@
+name: Deploy to Hugging Face Space
+
+# Pushes the repo to the HF Space and syncs Space secrets. Runs after CI passes
+# on main. The Space README and Dockerfile are derived during the sync so the
+# GitHub repo keeps its own.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-space
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  HF_OWNER: TTS-AGI
+  HF_SPACE: TTS-Arena-V2
+
+jobs:
+  deploy:
+    name: Sync to Space
+    runs-on: ubuntu-latest
+    # Only deploy when the triggering CI run succeeded (or on manual dispatch).
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true # pull the prompt corpus content, not just LFS pointers
+
+      - name: Sync deployment secrets to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MINIMAX_GROUP_ID: ${{ secrets.MINIMAX_GROUP_ID }}
+          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
+          ADMIN_USERS: ${{ secrets.ADMIN_USERS }}
+          PROVIDER_PLUGINS: ${{ secrets.PROVIDER_PLUGINS }}
+        run: |
+          chmod +x deploy/space/set-secrets.sh
+          deploy/space/set-secrets.sh "${HF_OWNER}/${HF_SPACE}"
+
+      - name: Push to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          REMOTE="https://${HF_OWNER}:${HF_TOKEN}@huggingface.co/spaces/${HF_OWNER}/${HF_SPACE}"
+
+          # Build a Space-flavored copy of the repo (no .git).
+          rsync -a --exclude='.git' --exclude='node_modules' ./ /tmp/space/
+          # Space README + Dockerfile take precedence; GitHub's stay in the repo.
+          mv /tmp/space/SPACES_README.md /tmp/space/README.md
+          mv /tmp/space/Dockerfile.space /tmp/space/Dockerfile
+
+          # Deploy as a single fresh commit (orphan history). This keeps the
+          # Space itself (repo + config) intact while ensuring no stray blob
+          # from past history can block the push (HF rejects binaries even from
+          # history). The prompt corpus ships via Git LFS; everything else is
+          # text (bun.lock is the text lockfile).
+          cd /tmp/space
+          git init -q
+          git lfs install --local
+          # Honor the repo's LFS rules and ensure the corpus is LFS-tracked.
+          git lfs track "apps/web/data/combined_prompts.txt"
+          git checkout -q -b main
+          git add -A
+          git commit -q -m "Deploy from github.com/${{ github.repository }}@${GITHUB_SHA::7}"
+          # Sanity: the corpus must be an LFS object, not an inlined blob.
+          git lfs ls-files | grep -q combined_prompts.txt \
+            || { echo "ERROR: prompt corpus is not LFS-tracked"; exit 1; }
+          git push -f "$REMOTE" main

@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { GenerateResponse, VoteResponse } from "@ttsa/shared";
-import { WaveformPlayer } from "./waveform-player";
+import { WaveformPlayer, type WaveformHandle } from "./waveform-player";
 import { SNAP } from "./motion";
 import { useAuth } from "./auth";
 
 type Phase = "compose" | "generating" | "listen" | "revealed";
 type Side = "a" | "b";
 const MAX_LEN = 1000;
+/** Seconds a clip must be heard (or its full length, if shorter) before voting. */
+const MIN_LISTEN_SECONDS = 3;
 
 type Battle = {
   sessionId: string;
@@ -39,6 +41,26 @@ export function Arena() {
   const [reveal, setReveal] = useState<VoteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Player handles (for autoplay A→B) and per-side "listened enough" state.
+  const playerA = useRef<WaveformHandle>(null);
+  const playerB = useRef<WaveformHandle>(null);
+  const [listened, setListened] = useState<{ a: boolean; b: boolean }>({
+    a: false,
+    b: false,
+  });
+  // Each clip's listen threshold = min(MIN_LISTEN_SECONDS, full duration).
+  const threshold = useRef<{ a: number; b: number }>({
+    a: MIN_LISTEN_SECONDS,
+    b: MIN_LISTEN_SECONDS,
+  });
+  const canVote = listened.a && listened.b;
+
+  function markListened(side: Side, current: number) {
+    if (current >= threshold.current[side]) {
+      setListened((prev) => (prev[side] ? prev : { ...prev, [side]: true }));
+    }
+  }
+
   const trimmed = text.trim();
   const overLimit = text.length > MAX_LEN;
   const canGenerate = trimmed.length > 0 && !overLimit;
@@ -49,6 +71,8 @@ export function Arena() {
     setWinner(null);
     setReveal(null);
     setBattle(null);
+    setListened({ a: false, b: false });
+    threshold.current = { a: MIN_LISTEN_SECONDS, b: MIN_LISTEN_SECONDS };
     setPhase("generating");
     try {
       const res = await fetch("/api/tts/generate", {
@@ -181,7 +205,20 @@ export function Arena() {
                   phase={phase}
                   winner={winner}
                   model={modelForSide("a", winner, reveal)}
+                  playerRef={playerA}
+                  canVote={canVote}
                   onVote={() => vote("a")}
+                  onReady={(d) => {
+                    threshold.current.a = Math.min(MIN_LISTEN_SECONDS, d);
+                    // Autoplay A as soon as it's ready.
+                    playerA.current?.play();
+                  }}
+                  onProgress={(t) => markListened("a", t)}
+                  onEnded={() => {
+                    markListened("a", threshold.current.a);
+                    // A finished → autoplay B.
+                    playerB.current?.play();
+                  }}
                 />
                 <Contestant
                   side="b"
@@ -189,7 +226,14 @@ export function Arena() {
                   phase={phase}
                   winner={winner}
                   model={modelForSide("b", winner, reveal)}
+                  playerRef={playerB}
+                  canVote={canVote}
                   onVote={() => vote("b")}
+                  onReady={(d) => {
+                    threshold.current.b = Math.min(MIN_LISTEN_SECONDS, d);
+                  }}
+                  onProgress={(t) => markListened("b", t)}
+                  onEnded={() => markListened("b", threshold.current.b)}
                 />
               </>
             )}
@@ -263,14 +307,24 @@ function Contestant({
   phase,
   winner,
   model,
+  playerRef,
+  canVote,
   onVote,
+  onReady,
+  onProgress,
+  onEnded,
 }: {
   side: Side;
   src: string;
   phase: Phase;
   winner: Side | null;
   model: RevealedModel | null;
+  playerRef: React.Ref<WaveformHandle>;
+  canVote: boolean;
   onVote: () => void;
+  onReady: (durationSeconds: number) => void;
+  onProgress: (currentSeconds: number) => void;
+  onEnded: () => void;
 }) {
   const revealed = phase === "revealed";
   const isWinner = winner === side;
@@ -320,14 +374,22 @@ function Contestant({
         )}
       </div>
 
-      <WaveformPlayer src={src} />
+      <WaveformPlayer
+        ref={playerRef}
+        src={src}
+        onReady={onReady}
+        onProgress={onProgress}
+        onEnded={onEnded}
+      />
 
       {!revealed && (
         <button
           onClick={onVote}
-          className="rounded-xl bg-fill py-3 text-sm font-semibold transition-colors hover:bg-ink hover:text-canvas"
+          disabled={!canVote}
+          title={canVote ? undefined : "Listen to both clips first"}
+          className="rounded-xl bg-fill py-3 text-sm font-semibold transition-colors hover:bg-ink hover:text-canvas disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-fill disabled:hover:text-ink"
         >
-          Vote {label}
+          {canVote ? `Vote ${label}` : "Listen to both…"}
         </button>
       )}
     </div>

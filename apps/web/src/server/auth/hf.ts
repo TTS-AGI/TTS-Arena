@@ -1,13 +1,20 @@
 /**
- * Hugging Face OAuth helpers + the account-age gate. We use the standard
- * authorization-code flow against huggingface.co and read the profile via
- * `whoami-v2`. Accounts younger than MIN_ACCOUNT_AGE_DAYS are rejected.
+ * Hugging Face OAuth helpers + the account-age gate. Uses the standard
+ * authorization-code flow. The OAuth issuer is configurable (so native Space
+ * OAuth via OPENID_PROVIDER_URL works), while the profile/overview API base
+ * stays on huggingface.co. Accounts younger than MIN_ACCOUNT_AGE_DAYS are
+ * rejected.
  */
 import { serverEnv } from "../env";
 
 const HF = "https://huggingface.co";
 const REDIRECT_PATH = "/api/auth/callback";
 export const MIN_ACCOUNT_AGE_DAYS = 30;
+
+/** OAuth issuer base (huggingface.co locally; the Space's OpenID issuer there). */
+function issuer(): string {
+  return serverEnv.hfOAuth.providerUrl();
+}
 
 export function redirectUri(): string {
   return new URL(REDIRECT_PATH, serverEnv.appUrl).toString();
@@ -23,12 +30,12 @@ export function authorizeUrl(state: string): string {
     scope: "openid profile email",
     state,
   });
-  return `${HF}/oauth/authorize?${params.toString()}`;
+  return `${issuer()}/oauth/authorize?${params.toString()}`;
 }
 
 /** Exchange an authorization code for an access token. */
 export async function exchangeCode(code: string): Promise<string> {
-  const res = await fetch(`${HF}/oauth/token`, {
+  const res = await fetch(`${issuer()}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({

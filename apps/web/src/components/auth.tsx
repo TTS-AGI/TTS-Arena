@@ -51,6 +51,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Once signed in, report the browser fingerprint (FingerprintJS) so logins
+  // can be correlated for abuse investigation. Best-effort, once per session.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const FP = (await import("@fingerprintjs/fingerprintjs")).default;
+        const agent = await FP.load();
+        const { visitorId } = await agent.get();
+        if (cancelled) return;
+        await fetch("/api/auth/fingerprint", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fingerprint: visitorId }),
+        });
+      } catch {
+        // ignore — fingerprinting is non-critical
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const requireAuth = useCallback((): boolean => {
     if (user) return true;
     setOpen(true);

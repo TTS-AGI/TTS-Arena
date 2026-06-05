@@ -1,0 +1,6 @@
+# Bun's text lockfile — keep it diffable and never treated as binary (HF Spaces
+# reject binary files outside Xet/LFS).
+bun.lock text eol=lf linguist-generated=true
+
+# Large prompt corpus is stored via Git LFS.
+apps/web/data/combined_prompts.txt filter=lfs diff=lfs merge=lfs -text

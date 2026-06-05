@@ -189,19 +189,25 @@ function Row({
   );
 }
 
-/** Provider logo on the leaderboard, with a neutral placeholder fallback. */
+/**
+ * Provider logo on the leaderboard. Always rendered on a white rounded tile so
+ * logos with black artwork (or transparent backgrounds) stay legible in both
+ * light and dark themes. Falls back to a monogram tile when there's no icon.
+ */
 function ModelLogo({ icon, name }: { icon: string | null; name: string }) {
   const [broken, setBroken] = useState(false);
   if (icon && !broken) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={icon}
-        alt=""
-        aria-hidden
-        onError={() => setBroken(true)}
-        className="h-6 w-6 shrink-0 rounded-md object-contain"
-      />
+      <span className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-md bg-white p-0.5 ring-1 ring-black/5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={icon}
+          alt=""
+          aria-hidden
+          onError={() => setBroken(true)}
+          className="h-full w-full object-contain"
+        />
+      </span>
     );
   }
   return (

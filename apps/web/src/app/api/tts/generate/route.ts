@@ -14,11 +14,7 @@ import {
 } from "@ttsa/shared";
 import { currentUser } from "@/server/auth/user";
 import { generateBattle } from "@/server/arena/generate";
-import {
-  isConsumed,
-  isDatasetPrompt,
-  isEnglish,
-} from "@/server/arena/sentences";
+import { isConsumed, isEnglish } from "@/server/arena/sentences";
 
 export async function POST(req: Request) {
   const user = await currentUser();
@@ -43,7 +39,7 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (isDatasetPrompt(text) && (await isConsumed(text))) {
+  if (await isConsumed(text)) {
     return NextResponse.json(
       { error: "that prompt has already been used — try another" },
       { status: 400 },

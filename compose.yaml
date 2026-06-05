@@ -43,7 +43,7 @@ services:
       - .:/app
       - web-node-modules:/app/node_modules
     command: >
-      sh -c "bun install --frozen-lockfile &&
+      sh -c "bun install &&
              cd apps/web &&
              bunx drizzle-kit migrate &&
              bun run src/server/db/seed.ts"
@@ -67,7 +67,7 @@ services:
       - router-node-modules:/app/node_modules
     command: >
       sh -c "apt-get update && apt-get install -y --no-install-recommends ffmpeg >/dev/null 2>&1;
-             bun install --frozen-lockfile &&
+             bun install &&
              bun --watch apps/router/src/index.ts"
 
   web:
@@ -96,7 +96,7 @@ services:
       - web-audio-cache:/audio-cache
       - web-audio-log:/audio
     command: >
-      sh -c "bun install --frozen-lockfile &&
+      sh -c "bun install &&
              cd apps/web &&
              bun run dev --hostname 0.0.0.0 --port 3000"
 

@@ -6,14 +6,14 @@ WORKDIR /app
 
 # ── deps: install the whole workspace (cached on manifests) ──
 FROM base AS deps
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/router/package.json apps/router/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/provider-sdk/package.json packages/provider-sdk/package.json
 COPY packages/providers/elevenlabs/package.json packages/providers/elevenlabs/package.json
 COPY packages/providers/minimax/package.json packages/providers/minimax/package.json
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # ── build: compile the Next.js standalone bundle ──
 FROM base AS build

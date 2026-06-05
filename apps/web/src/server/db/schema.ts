@@ -41,6 +41,35 @@ export const users = pgTable("users", {
   showInLeaderboard: boolean("show_in_leaderboard").notNull().default(true),
 });
 
+/* ── User logins (full history for abuse investigation) ───────────────── */
+/**
+ * One row per login (and per vote refresh), recording the IP, user agent, and
+ * browser fingerprint seen. Keeps the *entire* history — every IP/fingerprint a
+ * user has ever connected from — not just the latest.
+ */
+export const userLogins = pgTable(
+  "user_logins",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    /** Full client IP (resolved from forwarding headers). */
+    ip: varchar("ip", { length: 64 }),
+    userAgent: varchar("user_agent", { length: 500 }),
+    /** FingerprintJS visitor id supplied by the client. */
+    fingerprint: varchar("fingerprint", { length: 128 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    byUser: index("user_logins_user_idx").on(t.userId),
+    byIp: index("user_logins_ip_idx").on(t.ip),
+    byFingerprint: index("user_logins_fingerprint_idx").on(t.fingerprint),
+  }),
+);
+
 /* ── Models ───────────────────────────────────────────────────────────── */
 export const models = pgTable("models", {
   /** Arena slug, e.g. "eleven-multilingual-v2". Matches @ttsa/shared MODELS. */

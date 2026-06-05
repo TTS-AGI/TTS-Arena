@@ -39,7 +39,7 @@ export async function recordVote(
   // Origin is still recorded (so custom-prompt votes can be down-weighted or
   // audited later if gaming becomes a concern), but all votes currently count
   // toward the public board — there's no dataset-prompt flow in the UI.
-  const origin = isDatasetPrompt(session.text) ? "dataset" : "custom";
+  const origin = (await isDatasetPrompt(session.text)) ? "dataset" : "custom";
   const counts = true;
 
   await db.transaction(async (tx) => {

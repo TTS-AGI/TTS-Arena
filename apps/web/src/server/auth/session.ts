@@ -15,6 +15,20 @@ function secretKey(): Uint8Array {
   return new TextEncoder().encode(serverEnv.sessionSecret());
 }
 
+/**
+ * Cookie SameSite/Secure attributes. In the embeddable Space (a cross-site
+ * iframe) cookies must be SameSite=None; Secure to be sent at all; locally we
+ * use Lax over http. Exported so the OAuth-state cookie matches.
+ */
+export function cookieSecurity(): {
+  sameSite: "none" | "lax";
+  secure: boolean;
+} {
+  return serverEnv.isEmbedded()
+    ? { sameSite: "none", secure: true }
+    : { sameSite: "lax", secure: process.env.NODE_ENV === "production" };
+}
+
 export async function createSession(userId: number): Promise<void> {
   const token = await new SignJWT({ uid: userId })
     .setProtectedHeader({ alg: "HS256" })
@@ -25,8 +39,7 @@ export async function createSession(userId: number): Promise<void> {
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...cookieSecurity(),
     path: "/",
     maxAge: MAX_AGE_SECONDS,
   });

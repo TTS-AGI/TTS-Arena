@@ -1,14 +1,13 @@
 /**
  * Sentence helpers: hashing for the single-use pool, a lightweight English
  * heuristic, and consumed-sentence bookkeeping. The live prompt pool is the
- * shared PROMPTS list for now (a dataset import can replace it later without
- * changing this interface).
+ * `combined_prompts.txt` corpus (see prompt-pool), accessed by random line.
  */
 import { createHash } from "node:crypto";
-import { eq, inArray, sql } from "drizzle-orm";
-import { PROMPTS } from "@ttsa/shared";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { consumedSentences } from "../db/schema";
+import { promptCount, randomPrompt } from "./prompt-pool";
 
 export function hashSentence(text: string): string {
   return createHash("sha256").update(text.trim()).digest("hex");
@@ -40,20 +39,28 @@ export async function markConsumed(text: string): Promise<void> {
     .onConflictDoNothing();
 }
 
-/** Whether a prompt is part of the curated dataset (vs a user's custom text). */
-export function isDatasetPrompt(text: string): boolean {
-  return PROMPTS.includes(text.trim());
+/**
+ * Whether a prompt came from the corpus rather than free-typed by the user.
+ * The corpus has ~500k lines, so membership isn't checked exhaustively; a
+ * prompt is treated as "dataset" only when it was served via the random
+ * endpoint (which marks it consumed). Free-typed text is "custom".
+ */
+export async function isDatasetPrompt(text: string): Promise<boolean> {
+  return isConsumed(text);
 }
 
-/** A random unconsumed dataset prompt, or null if all are consumed. */
+/**
+ * A random unconsumed prompt from the corpus. Tries a few random draws and
+ * returns the first not-yet-consumed one (the corpus is far larger than the
+ * consumed set, so a hit is near-certain in one or two tries).
+ */
 export async function randomUnconsumed(): Promise<string | null> {
-  const consumed = await db
-    .select({ hash: consumedSentences.sentenceHash })
-    .from(consumedSentences);
-  const consumedHashes = new Set(consumed.map((c) => c.hash));
-  const pool = PROMPTS.filter((p) => !consumedHashes.has(hashSentence(p)));
-  if (pool.length === 0) return null;
-  return pool[Math.floor(Math.random() * pool.length)]!;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = await randomPrompt();
+    if (!(await isConsumed(candidate))) return candidate;
+  }
+  // Extremely unlikely (corpus exhausted-ish); return a fresh draw anyway.
+  return randomPrompt();
 }
 
 export async function sentenceStats(): Promise<{
@@ -62,12 +69,10 @@ export async function sentenceStats(): Promise<{
   remaining: number;
   consumptionPct: number;
 }> {
-  const total = PROMPTS.length;
-  const poolHashes = PROMPTS.map(hashSentence);
-  const rows = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(consumedSentences)
-    .where(inArray(consumedSentences.sentenceHash, poolHashes));
+  const [total, rows] = await Promise.all([
+    promptCount(),
+    db.select({ count: sql<number>`count(*)::int` }).from(consumedSentences),
+  ]);
   const consumed = Math.min(total, rows[0]?.count ?? 0);
   return {
     total,

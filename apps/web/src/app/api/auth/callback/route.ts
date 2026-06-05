@@ -16,6 +16,8 @@ import {
 } from "@/server/auth/hf";
 import { upsertUser } from "@/server/auth/user";
 import { createSession } from "@/server/auth/session";
+import { recordLogin } from "@/server/auth/logins";
+import { clientIp, userAgent } from "@/server/request-info";
 
 function home(reason?: string): NextResponse {
   const url = new URL(serverEnv.appUrl);
@@ -52,6 +54,14 @@ export async function GET(req: NextRequest) {
       overview.createdAt,
     );
     await createSession(user.id);
+    // Record the login (IP + UA now; the fingerprint arrives client-side via
+    // /api/auth/fingerprint once the page loads).
+    await recordLogin({
+      userId: user.id,
+      ip: clientIp(req),
+      userAgent: userAgent(req),
+      fingerprint: null,
+    });
     return home();
   } catch {
     return home("error");

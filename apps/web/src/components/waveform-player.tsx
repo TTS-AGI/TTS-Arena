@@ -1,31 +1,60 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import WaveSurfer from "wavesurfer.js";
 
+export type WaveformHandle = {
+  /** Start playback from the current position. */
+  play: () => void;
+};
+
 /**
- * Real audio player built on Wavesurfer.js. Renders the decoded waveform of a
- * remote clip and plays it with a click. Themed to the design tokens; the
- * played portion takes the accent.
+ * Real audio player built on Wavesurfer.js. Exposes an imperative `play()` (so
+ * the arena can autoplay A then B) and reports readiness, listened time, and
+ * end events so the parent can gate voting on a minimum listen.
  */
-export function WaveformPlayer({ src }: { src: string }) {
+export const WaveformPlayer = forwardRef<
+  WaveformHandle,
+  {
+    src: string;
+    onReady?: (durationSeconds: number) => void;
+    onProgress?: (currentSeconds: number) => void;
+    onEnded?: () => void;
+  }
+>(function WaveformPlayer({ src, onReady, onProgress, onEnded }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
+  // Keep latest callbacks in refs so the wavesurfer effect doesn't re-init.
+  const cbs = useRef({ onReady, onProgress, onEnded });
+  cbs.current = { onReady, onProgress, onEnded };
+
+  useImperativeHandle(ref, () => ({
+    play: () => {
+      wsRef.current?.play().catch(() => {});
+    },
+  }));
+
   useEffect(() => {
     if (!containerRef.current) return;
     const styles = getComputedStyle(document.documentElement);
-    const ink3 = styles.getPropertyValue("--color-line-2").trim() || "#ccc";
+    const wave = styles.getPropertyValue("--color-line-2").trim() || "#ccc";
     const accent =
       styles.getPropertyValue("--color-accent").trim() || "#5b5bd6";
 
     const ws = WaveSurfer.create({
       container: containerRef.current,
       height: 40,
-      waveColor: ink3,
+      waveColor: wave,
       progressColor: accent,
       cursorWidth: 0,
       barWidth: 3,
@@ -36,14 +65,21 @@ export function WaveformPlayer({ src }: { src: string }) {
     });
     wsRef.current = ws;
 
-    ws.on("ready", () => setReady(true));
+    ws.on("ready", () => {
+      setReady(true);
+      cbs.current.onReady?.(ws.getDuration());
+    });
     ws.on("play", () => setPlaying(true));
     ws.on("pause", () => setPlaying(false));
     ws.on("finish", () => {
       setPlaying(false);
       setElapsed(0);
+      cbs.current.onEnded?.();
     });
-    ws.on("timeupdate", (t) => setElapsed(t));
+    ws.on("timeupdate", (t) => {
+      setElapsed(t);
+      cbs.current.onProgress?.(t);
+    });
 
     return () => {
       ws.destroy();
@@ -80,4 +116,4 @@ export function WaveformPlayer({ src }: { src: string }) {
       </span>
     </div>
   );
-}
+});
