@@ -47,3 +47,4 @@ drizzle/meta/_journal.json.bak
 .audio-cache/
 **/.audio-cache/
 .claude/
+packages/providers/_private/

@@ -41,32 +41,10 @@ jobs:
       - name: Sync deployment secrets to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
-          ADMIN_USERS: ${{ secrets.ADMIN_USERS }}
-          PROVIDER_PLUGINS: ${{ secrets.PROVIDER_PLUGINS }}
-          # Public providers
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-          MINIMAX_GROUP_ID: ${{ secrets.MINIMAX_GROUP_ID }}
-          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
-          HUME_API_KEY: ${{ secrets.HUME_API_KEY }}
-          TYPECAST_API_KEY: ${{ secrets.TYPECAST_API_KEY }}
-          GRADIUM_API_KEY: ${{ secrets.GRADIUM_API_KEY }}
-          CHATTERBOX_API_KEY: ${{ secrets.CHATTERBOX_API_KEY }}
-          INWORLD_API_KEY: ${{ secrets.INWORLD_API_KEY }}
-          MARS_API_KEY: ${{ secrets.MARS_API_KEY }}
-          TONTAUBE_API_KEY: ${{ secrets.TONTAUBE_API_KEY }}
-          # Private providers
-          PARMESAN_BASE_URL: ${{ secrets.PARMESAN_BASE_URL }}
-          PARMESAN_API_KEY: ${{ secrets.PARMESAN_API_KEY }}
-          LANTERNFISH_API_URL: ${{ secrets.LANTERNFISH_API_URL }}
-          LANTERNFISH_API_KEY: ${{ secrets.LANTERNFISH_API_KEY }}
-          LANTERNFISH_MODEL: ${{ secrets.LANTERNFISH_MODEL }}
-          LANTERNFISH_REFERENCE_ID: ${{ secrets.LANTERNFISH_REFERENCE_ID }}
-          VOCU_API_KEY: ${{ secrets.VOCU_API_KEY }}
-          VOCU_BASE_URL: ${{ secrets.VOCU_BASE_URL }}
-          NLS_BASE_URL: ${{ secrets.NLS_BASE_URL }}
-          NLS_TOKEN: ${{ secrets.NLS_TOKEN }}
+          # Pass ALL repo secrets as one JSON blob so provider names (public or
+          # private) never appear in this public workflow. set-secrets.sh syncs
+          # every key to the Space except the infra-only ones it excludes.
+          ALL_SECRETS: ${{ toJSON(secrets) }}
         run: |
           chmod +x deploy/space/set-secrets.sh
           deploy/space/set-secrets.sh "${HF_OWNER}/${HF_SPACE}"
@@ -80,7 +58,11 @@ jobs:
 
           REMOTE="https://${HF_OWNER}:${HF_TOKEN}@huggingface.co/spaces/${HF_OWNER}/${HF_SPACE}"
 
-          # Build a Space-flavored copy of the repo (no .git).
+          # Build a Space-flavored copy of the repo (no .git). The private
+          # providers are NOT vendored here — the Space's Docker build clones
+          # them itself using the PRIVATE_PROVIDERS_TOKEN Space secret (mounted
+          # as a build secret), so the private source never enters the Space
+          # repo and the Space can be made public safely.
           rsync -a --exclude='.git' --exclude='node_modules' ./ /tmp/space/
           # Space README + Dockerfile take precedence; GitHub's stay in the repo.
           mv /tmp/space/SPACES_README.md /tmp/space/README.md

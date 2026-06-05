@@ -1,12 +1,16 @@
 /**
- * Seed the `models` table.
+ * Seed the `models` table from the provider packages we can import directly.
  *
- * The router is the source of truth for the catalog, so we try it first
- * (getCatalog → ensureModelsSeeded). If the router isn't up yet (the entrypoint
- * seeds before starting it), fall back to the provider packages we can import
- * directly. Either way it's idempotent: display metadata is refreshed, ratings
- * and counts are preserved. Models also self-heal at generate time via
- * ensureModelsSeeded, so a stale seed can't break voting.
+ * This is just a warm start so the leaderboard isn't empty on first boot; it
+ * doesn't need to be exhaustive. The authoritative roster is the router
+ * catalog, and every model (public or private) is upserted into the DB at
+ * generate time via ensureModelsSeeded — so a vote can never reference an
+ * unseeded model even if it's not listed here.
+ *
+ * Kept dependency-free of the arena layer because the Space runtime image only
+ * ships src/server/db (not src/server/arena).
+ *
+ * Idempotent: display metadata is refreshed; ratings/counts are preserved.
  *
  * Run with: bun run db:seed
  */
@@ -15,16 +19,8 @@ import "@ttsa/provider-elevenlabs";
 import "@ttsa/provider-minimax";
 import { db } from "./client";
 import { models } from "./schema";
-import { getCatalog, ensureModelsSeeded } from "../arena/catalog";
 
-async function seedFromRouter(): Promise<number> {
-  const catalog = await getCatalog();
-  if (catalog.length === 0) throw new Error("router returned no models");
-  await ensureModelsSeeded(catalog);
-  return catalog.length;
-}
-
-async function seedFromPackages(): Promise<number> {
+async function seed() {
   const catalog = allArenaModels();
   for (const m of catalog) {
     await db
@@ -45,25 +41,12 @@ async function seedFromPackages(): Promise<number> {
           isOpen: m.open,
           isActive: m.enabled,
           url: m.url,
-          icon: (m.icon as string | undefined) ?? null,
+          icon: m.icon ?? null,
           updatedAt: new Date(),
         },
       });
   }
-  return catalog.length;
-}
-
-async function seed() {
-  try {
-    const n = await seedFromRouter();
-    console.info(`Seeded ${n} models from the router catalog.`);
-  } catch (err) {
-    console.warn(
-      `Router catalog unavailable (${err instanceof Error ? err.message : err}); seeding from provider packages.`,
-    );
-    const n = await seedFromPackages();
-    console.info(`Seeded ${n} models from provider packages.`);
-  }
+  console.info(`Seeded ${catalog.length} models from provider packages.`);
 }
 
 seed()

@@ -12,10 +12,11 @@ WORKDIR /app
 
 # ── deps ──
 FROM base AS deps
-# better-sqlite3 is a native module; ensure a toolchain is present so it builds
-# even when no matching prebuilt binary is available for this platform.
+# git + ca-certificates for cloning the private providers over HTTPS; build
+# toolchain for native modules (better-sqlite3) when no prebuilt binary matches.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+  && apt-get install -y --no-install-recommends \
+       git ca-certificates python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json bun.lock ./
 COPY apps/web/package.json apps/web/package.json
@@ -23,6 +24,36 @@ COPY apps/router/package.json apps/router/package.json
 # Copy every workspace manifest (providers grow over time, so copy the tree's
 # package.json files rather than enumerating each).
 COPY packages/ packages/
+
+# Pull the private providers straight into the workspace using a build-time
+# secret (a read-only GH token Space secret). This keeps the private source out
+# of BOTH the Space repo and the build context — the Space can be public without
+# exposing it. The token is mounted only for this layer and never persisted.
+# PRIVATE_PROVIDERS_REPO defaults to the known repo; override via build arg.
+# If the secret is absent the build still succeeds (no private providers).
+ARG PRIVATE_PROVIDERS_REPO=TTS-AGI/private-providers
+RUN --mount=type=secret,id=PRIVATE_PROVIDERS_TOKEN,mode=0444,required=false \
+    if [ -s /run/secrets/PRIVATE_PROVIDERS_TOKEN ]; then \
+      tok="$(cat /run/secrets/PRIVATE_PROVIDERS_TOKEN)"; \
+      git clone --depth 1 \
+        "https://x-access-token:${tok}@github.com/${PRIVATE_PROVIDERS_REPO}.git" \
+        packages/providers/_private \
+      && rm -rf packages/providers/_private/.git \
+      && echo "cloned private providers into workspace" \
+      || { echo "ERROR: token present but private provider clone failed" >&2; exit 1; }; \
+    else \
+      echo "no PRIVATE_PROVIDERS_TOKEN secret; building without private providers"; \
+    fi; \
+    # Ensure the dir always exists so later COPY --from=deps never fails. A stub
+    # package.json (private, not a workspace match) keeps it inert when empty.
+    if [ ! -e packages/providers/_private/package.json ]; then \
+      mkdir -p packages/providers/_private; \
+      echo '{"name":"@ttsa-private/_placeholder","private":true,"version":"0.0.0"}' \
+        > packages/providers/_private/package.json; \
+    fi
+
+# Install after the private package is in place so bun links it as a workspace
+# (node_modules/@ttsa-private/providers), resolvable by the router.
 RUN bun install
 
 # ── build the web app ──
@@ -50,7 +81,12 @@ COPY apps/router ./apps/router
 COPY apps/web/drizzle ./apps/web/drizzle
 COPY apps/web/drizzle.config.ts ./apps/web/drizzle.config.ts
 COPY apps/web/src/server/db ./apps/web/src/server/db
+# Public packages from the repo, then the private providers cloned in `deps`
+# (kept out of the repo + build context). The node_modules copied from `deps`
+# already contains bun's workspace symlink node_modules/@ttsa-private/providers
+# -> packages/providers/_private, so the router resolves it via PROVIDER_PLUGINS.
 COPY packages ./packages
+COPY --from=deps /app/packages/providers/_private ./packages/providers/_private
 
 # The prompt corpus (Git LFS). Baked into the image so it ships with the deploy
 # (the source URL is not guaranteed to stay up). PROMPTS_FILE points the app at

@@ -149,30 +149,15 @@ function Row({
       )}
 
       <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
-        <ModelLogo icon={model.icon} name={model.name} />
-        <div className="flex min-w-0 items-center gap-2">
-          <a
-            href={model.url}
-            target="_blank"
-            rel="noreferrer"
-            className="truncate text-[0.95rem] leading-tight font-semibold hover:text-accent"
-          >
-            {model.name}
-          </a>
-          {model.open && (
-            <span className="shrink-0 rounded-full bg-fill px-1.5 py-0.5 text-[0.6rem] font-medium text-ink-3">
-              OSS
-            </span>
-          )}
-          {model.preliminary && (
-            <span
-              title="Fewer than 300 votes — rating is provisional"
-              className="shrink-0 rounded-full bg-fill px-1.5 py-0.5 text-[0.6rem] font-medium text-ink-3"
-            >
-              preliminary
-            </span>
-          )}
-        </div>
+        <ModelLogo icon={model.icon} />
+        <a
+          href={model.url}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate text-[0.95rem] leading-tight font-semibold hover:text-accent"
+        >
+          {model.name}
+        </a>
       </div>
 
       <div className="relative text-right">
@@ -190,11 +175,12 @@ function Row({
 }
 
 /**
- * Provider logo on the leaderboard. Always rendered on a white rounded tile so
- * logos with black artwork (or transparent backgrounds) stay legible in both
- * light and dark themes. Falls back to a monogram tile when there's no icon.
+ * Provider logo on the leaderboard. Rendered on a white rounded tile so logos
+ * with black artwork (or transparent backgrounds) stay legible in both themes.
+ * When there's no icon (or it fails to load), render a blank tile — no monogram
+ * letter — to keep the name column aligned.
  */
-function ModelLogo({ icon, name }: { icon: string | null; name: string }) {
+function ModelLogo({ icon }: { icon: string | null }) {
   const [broken, setBroken] = useState(false);
   if (icon && !broken) {
     return (
@@ -210,12 +196,5 @@ function ModelLogo({ icon, name }: { icon: string | null; name: string }) {
       </span>
     );
   }
-  return (
-    <span
-      aria-hidden
-      className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-fill text-[0.6rem] font-semibold text-ink-3"
-    >
-      {name.slice(0, 1).toUpperCase()}
-    </span>
-  );
+  return <span aria-hidden className="h-6 w-6 shrink-0 rounded-md bg-fill" />;
 }

@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Sync deployment secrets onto the HF Space via the Hub API. Only non-empty
-# values are pushed, so secrets you haven't set in GitHub are left untouched on
-# the Space. Requires HF_TOKEN (write) in the environment.
+# values are pushed, and secrets already set on the Space are skipped (to avoid
+# HF's 429 rate limit). Provider names are NOT hardcoded here: the full set of
+# repo secrets arrives as a JSON blob in $ALL_SECRETS (GitHub's
+# toJSON(secrets)), and everything except an infra-only exclude-list is synced.
 #
-#   HF_TOKEN=... ./set-secrets.sh OWNER/SPACE
+# Requires HF_TOKEN (write) and ALL_SECRETS (JSON) in the environment.
+#
+#   HF_TOKEN=... ALL_SECRETS='{"K":"v",...}' ./set-secrets.sh OWNER/SPACE
 set -euo pipefail
 
 REPO="${1:?usage: set-secrets.sh OWNER/SPACE}"
@@ -105,38 +109,42 @@ set_secret() {
 
 echo "[set-secrets] syncing secrets to ${REPO}"
 
-# Provider keys + arena config. Values come from the CI environment (GitHub
-# secrets). SESSION_SECRET / OAuth are NOT set here — the Space uses its native
-# Hugging Face OAuth.
-# Core
-set_secret ROUTER_API_KEY "${ROUTER_API_KEY:-}"
-set_secret ADMIN_USERS "${ADMIN_USERS:-}"
-set_secret PROVIDER_PLUGINS "${PROVIDER_PLUGINS:-}"
+# Sync every GitHub repo secret to the Space, EXCEPT infra-only ones that must
+# not leak into the Space's runtime. Provider names (public or private) are NOT
+# enumerated here, so this public script reveals nothing about which providers
+# exist — new providers are picked up automatically by adding a repo secret.
+#
+# Secrets arrive as one JSON blob in $ALL_SECRETS (GitHub's toJSON(secrets)).
+# Keys are read with python; values are passed via env to set_secret so they're
+# never interpolated into the command line.
+# Note: PRIVATE_PROVIDERS_TOKEN IS synced — the Space's Docker build mounts it
+# as a build secret (RUN --mount=type=secret,id=PRIVATE_PROVIDERS_TOKEN) to
+# clone the private providers. HF_TOKEN/github_token stay out (deploy infra).
+EXCLUDE_RE='^(github_token|HF_TOKEN|PRIVATE_PROVIDERS_REPO|SYNC_SECRETS_FORCE)$'
 
-# Public provider keys
-set_secret ELEVENLABS_API_KEY "${ELEVENLABS_API_KEY:-}"
-set_secret MINIMAX_API_KEY "${MINIMAX_API_KEY:-}"
-set_secret MINIMAX_GROUP_ID "${MINIMAX_GROUP_ID:-}"
-set_secret CARTESIA_API_KEY "${CARTESIA_API_KEY:-}"
-set_secret HUME_API_KEY "${HUME_API_KEY:-}"
-set_secret TYPECAST_API_KEY "${TYPECAST_API_KEY:-}"
-set_secret GRADIUM_API_KEY "${GRADIUM_API_KEY:-}"
-set_secret CHATTERBOX_API_KEY "${CHATTERBOX_API_KEY:-}"
-set_secret INWORLD_API_KEY "${INWORLD_API_KEY:-}"
-set_secret MARS_API_KEY "${MARS_API_KEY:-}"
-set_secret TONTAUBE_API_KEY "${TONTAUBE_API_KEY:-}"
-
-# Private provider keys (used only when the private plugin package is loaded)
-set_secret PARMESAN_BASE_URL "${PARMESAN_BASE_URL:-}"
-set_secret PARMESAN_API_KEY "${PARMESAN_API_KEY:-}"
-set_secret LANTERNFISH_API_URL "${LANTERNFISH_API_URL:-}"
-set_secret LANTERNFISH_API_KEY "${LANTERNFISH_API_KEY:-}"
-set_secret LANTERNFISH_MODEL "${LANTERNFISH_MODEL:-}"
-set_secret LANTERNFISH_REFERENCE_ID "${LANTERNFISH_REFERENCE_ID:-}"
-set_secret VOCU_API_KEY "${VOCU_API_KEY:-}"
-set_secret VOCU_BASE_URL "${VOCU_BASE_URL:-}"
-set_secret NLS_BASE_URL "${NLS_BASE_URL:-}"
-set_secret NLS_TOKEN "${NLS_TOKEN:-}"
+if [ -z "${ALL_SECRETS:-}" ]; then
+  echo "[set-secrets] ALL_SECRETS is empty; nothing to sync" >&2
+else
+  # Emit the secret keys to sync (one per line), excluding the infra-only set.
+  KEYS="$(ALL_SECRETS="$ALL_SECRETS" EXCLUDE_RE="$EXCLUDE_RE" python3 - <<'PY'
+import json, os, re
+exclude = re.compile(os.environ["EXCLUDE_RE"])
+try:
+    secrets = json.loads(os.environ["ALL_SECRETS"])
+except Exception:
+    secrets = {}
+for k in secrets:
+    if not exclude.match(k):
+        print(k)
+PY
+)"
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    # Pull this secret's value out of the JSON blob (kept out of argv).
+    val="$(ALL_SECRETS="$ALL_SECRETS" KEY="$key" python3 -c 'import json,os; print(json.loads(os.environ["ALL_SECRETS"]).get(os.environ["KEY"],""), end="")')"
+    set_secret "$key" "$val"
+  done <<<"$KEYS"
+fi
 
 if [ "$RATE_LIMITED" = "1" ]; then
   echo "[set-secrets] done with warnings: some secrets were rate-limited (429)." >&2
