@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/providers/*"
   ],
   "scripts": {
     "dev": "bun run --filter '@ttsa/web' dev",

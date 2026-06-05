@@ -1,0 +1,17 @@
+{
+  "name": "@ttsa/provider-minimax",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no lint (covered by root prettier)'",
+    "build": "echo 'consumed as source; no build step'"
+  },
+  "dependencies": {
+    "@ttsa/provider-sdk": "workspace:*"
+  }
+}

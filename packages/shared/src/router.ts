@@ -16,7 +16,9 @@ export type RouterTTSRequest = z.infer<typeof routerTTSRequestSchema>;
 export const routerTTSResponseSchema = z.object({
   status: z.literal("success"),
   provider: z.string(),
-  model: z.string().nullable(),
+  model: z.string(),
+  /** The voice the provider actually used (for per-voice arena stats). */
+  voice: z.string(),
   audioData: z.string(), // base64
   extension: z.string(), // "mp3" | "wav" | ...
 });
