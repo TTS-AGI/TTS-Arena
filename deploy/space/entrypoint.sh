@@ -10,6 +10,9 @@ export PATH="$PGBIN:$PATH"
 # Postgres must run as the `postgres` user; ensure it owns its data + buckets.
 mkdir -p "$PGDATA" /audio
 chown -R postgres:postgres /data /audio
+# Postgres refuses to start unless the data dir is exactly 0700 (or 0750). The
+# persistent bucket can mount with looser perms, so enforce it every boot.
+chmod 700 "$PGDATA"
 
 # First boot: initialize the cluster on the persistent volume.
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
@@ -18,6 +21,26 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   echo "host all all 127.0.0.1/32 trust" >> "$PGDATA/pg_hba.conf"
   echo "listen_addresses='127.0.0.1'" >> "$PGDATA/postgresql.conf"
 fi
+
+# A hard container stop can leave a stale lock file that makes pg_ctl think a
+# server is still running. Remove it if no process actually holds the port.
+if [ -f "$PGDATA/postmaster.pid" ] && ! gosu postgres pg_isready -p 5432 -q; then
+  echo "[entrypoint] removing stale postmaster.pid"
+  rm -f "$PGDATA/postmaster.pid"
+fi
+
+# The persistent bucket sync drops empty directories, but Postgres needs its
+# ephemeral runtime subdirs to exist or it FATALs ("could not open directory
+# pg_notify"). Recreate any that are missing (they're meant to be empty).
+echo "[entrypoint] ensuring runtime subdirectories exist"
+for d in \
+  pg_notify pg_stat_tmp pg_serial pg_subtrans pg_snapshots pg_commit_ts \
+  pg_twophase pg_replslot pg_tblspc pg_wal/archive_status \
+  pg_logical pg_logical/snapshots pg_logical/mappings; do
+  mkdir -p "$PGDATA/$d"
+done
+chown -R postgres:postgres "$PGDATA"
+chmod 700 "$PGDATA"
 
 echo "[entrypoint] starting Postgres"
 gosu postgres pg_ctl -D "$PGDATA" -w -o "-p 5432" start
