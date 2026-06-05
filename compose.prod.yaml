@@ -54,8 +54,12 @@ services:
       ROUTER_API_KEY: ${ROUTER_API_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:3000}
       PORT: "3000"
+      AUDIO_CACHE_DIR: /audio-cache
     ports:
       - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - web-audio-cache:/audio-cache
 
 volumes:
   db-data:
+  web-audio-cache:

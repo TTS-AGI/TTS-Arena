@@ -10,6 +10,17 @@ export const BASE_ELO = 1500;
 export const ELO_K = 2;
 /** A model needs strictly more than this many counted matches to be ranked. */
 export const RANK_THRESHOLD = 250;
+/**
+ * Vote count at which a model's rating switches from live Glicko-2 (stable when
+ * data is sparse) to the Bradley–Terry fit (the principled global ranking once
+ * there's enough data). Below it, ratings are shown as "preliminary".
+ */
+export const ESTABLISHED_THRESHOLD = 300;
+
+/** True once a model has enough counted matches to use its BT rating. */
+export function isEstablished(matchCount: number): boolean {
+  return matchCount >= ESTABLISHED_THRESHOLD;
+}
 
 export type Tier = "S" | "A" | "B";
 

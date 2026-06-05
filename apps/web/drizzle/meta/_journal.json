@@ -15,6 +15,27 @@
       "when": 1780631507436,
       "tag": "0001_wandering_makkari",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780633078595,
+      "tag": "0002_flippant_clea",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780634768512,
+      "tag": "0003_tired_leo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780635373910,
+      "tag": "0004_calm_cargill",
+      "breakpoints": true
     }
   ]
 }

@@ -19,7 +19,14 @@ export type Glicko = {
 };
 
 export const DEFAULT_RATING = 1500;
-export const DEFAULT_RD = 350;
+/**
+ * Initial rating deviation. The textbook default is 350, but that makes a
+ * model's first few votes swing by >150 points — wildly out of scale with the
+ * Elo (k=2) the rest of the system uses. 60 keeps early movement to ~10 points
+ * and single digits once a model has some games, so Glicko-2 and Elo sit on
+ * roughly the same scale and the Glicko→Bradley–Terry handoff isn't jarring.
+ */
+export const DEFAULT_RD = 60;
 export const DEFAULT_VOL = 0.06;
 
 /** System constant τ: constrains volatility change. 0.3–1.2 typical. */

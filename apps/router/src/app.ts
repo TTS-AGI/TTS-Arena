@@ -20,7 +20,7 @@ import {
   getProvider,
 } from "@ttsa/provider-sdk";
 import { routerTTSRequestSchema } from "@ttsa/shared";
-import { normalizeBase64Audio } from "./audio";
+import { normalizeAudio } from "./audio";
 
 export function createApp() {
   const app = new Hono();
@@ -76,7 +76,7 @@ export function createApp() {
         400,
       );
     }
-    const { text, provider: providerId, model } = parsed.data;
+    const { text, provider: providerId, model, includeRaw } = parsed.data;
 
     const provider = getProvider(providerId);
     if (!provider) {
@@ -91,7 +91,7 @@ export function createApp() {
 
     try {
       const result = await provider.synthesize({ text, model: model ?? null });
-      const audioData = await normalizeBase64Audio(
+      const normalized = await normalizeAudio(
         result.audioBase64,
         result.extension,
       );
@@ -100,8 +100,15 @@ export function createApp() {
         provider: provider.id,
         model: result.model,
         voice: result.voice,
-        audioData,
-        extension: result.extension,
+        audioData: normalized.base64,
+        extension: normalized.extension,
+        // Pre-normalization audio, for the caller to archive (RLHF dataset).
+        ...(includeRaw
+          ? {
+              rawAudioData: result.audioBase64,
+              rawExtension: result.extension,
+            }
+          : {}),
       });
     } catch (err) {
       if (err instanceof ProviderError) {

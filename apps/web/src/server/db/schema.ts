@@ -51,6 +51,8 @@ export const models = pgTable("models", {
   isOpen: boolean("is_open").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   url: varchar("url", { length: 255 }),
+  /** Optional provider logo URL shown on the leaderboard. */
+  icon: varchar("icon", { length: 255 }),
 
   // ── Live Glicko-2 state ──
   /** Display rating (Glicko-2, centered on 1500). */
@@ -90,6 +92,13 @@ export const votes = pgTable(
     /** Provider-scoped voice ids actually used, for per-voice analytics. */
     chosenVoice: varchar("chosen_voice", { length: 120 }),
     rejectedVoice: varchar("rejected_voice", { length: 120 }),
+
+    /**
+     * Paths (in the /audio persistent bucket) to the PRE-normalization audio
+     * for each side, retained for a future RLHF/preference dataset release.
+     */
+    chosenAudioPath: text("chosen_audio_path"),
+    rejectedAudioPath: text("rejected_audio_path"),
 
     /** SHA-256 of the trimmed prompt; ties votes to the sentence pool. */
     sentenceHash: varchar("sentence_hash", { length: 64 }),
@@ -172,6 +181,50 @@ export const consumedSentences = pgTable("consumed_sentences", {
     .notNull()
     .defaultNow(),
 });
+
+/* ── Battle sessions ──────────────────────────────────────────────────── */
+/**
+ * A live blind battle, persisted so it survives server restarts and is shared
+ * across requests/instances. Model identity lives here (server-side only) until
+ * the user votes. Audio bytes are cached on disk (see arena/audio-cache); only
+ * the file paths are stored here.
+ */
+export const battleSessions = pgTable(
+  "battle_sessions",
+  {
+    /** Opaque session id (uuid) handed to the client. */
+    id: varchar("id", { length: 64 }).primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    modelType: varchar("model_type", { length: 20 }).notNull(),
+    text: text("text").notNull(),
+    sentenceHash: varchar("sentence_hash", { length: 64 }).notNull(),
+
+    aModelId: varchar("a_model_id", { length: 100 }).notNull(),
+    aVoice: varchar("a_voice", { length: 120 }).notNull(),
+    aPath: text("a_path").notNull(),
+    aExt: varchar("a_ext", { length: 12 }).notNull(),
+    /** Path (in the /audio log bucket) to side A's pre-normalization clip. */
+    aLogPath: text("a_log_path"),
+
+    bModelId: varchar("b_model_id", { length: 100 }).notNull(),
+    bVoice: varchar("b_voice", { length: 120 }).notNull(),
+    bPath: text("b_path").notNull(),
+    bExt: varchar("b_ext", { length: 12 }).notNull(),
+    /** Path (in the /audio log bucket) to side B's pre-normalization clip. */
+    bLogPath: text("b_log_path"),
+
+    voted: boolean("voted").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    byExpiry: index("battle_sessions_expiry_idx").on(t.expiresAt),
+  }),
+);
 
 /* ── Relations ────────────────────────────────────────────────────────── */
 export const usersRelations = relations(users, ({ many }) => ({

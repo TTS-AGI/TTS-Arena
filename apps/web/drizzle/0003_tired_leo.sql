@@ -1,0 +1,1 @@
+ALTER TABLE "models" ADD COLUMN "icon" varchar(255);

@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   }
   const { sessionId, chosen } = parsed.data;
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "session expired" }, { status: 410 });
   }
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
     );
   }
 
-  markVoted(session.id);
+  await markVoted(session.id);
   const result = await recordVote(session, chosen);
-  deleteSession(session.id); // audio no longer needed once revealed
+  await deleteSession(session.id); // audio no longer needed once revealed
 
   // Reveal display metadata from the DB (current name/url/open for each id).
   const rows = await db

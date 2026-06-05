@@ -140,11 +140,24 @@ export const elevenlabs: TTSProvider = {
 
 registerProvider(elevenlabs);
 
+const ICON = "/logos/elevenlabs.svg";
+
 registerArenaModels([
+  {
+    id: "eleven-v3",
+    name: "Eleven v3",
+    url: "https://elevenlabs.io/",
+    icon: ICON,
+    open: false,
+    provider: "elevenlabs",
+    routerModel: "eleven_v3",
+    enabled: true,
+  },
   {
     id: "eleven-multilingual-v2",
     name: "Eleven Multilingual v2",
     url: "https://elevenlabs.io/",
+    icon: ICON,
     open: false,
     provider: "elevenlabs",
     routerModel: "eleven_multilingual_v2",
@@ -154,6 +167,7 @@ registerArenaModels([
     id: "eleven-turbo-v2.5",
     name: "Eleven Turbo v2.5",
     url: "https://elevenlabs.io/",
+    icon: ICON,
     open: false,
     provider: "elevenlabs",
     routerModel: "eleven_turbo_v2_5",
@@ -163,6 +177,7 @@ registerArenaModels([
     id: "eleven-flash-v2.5",
     name: "Eleven Flash v2.5",
     url: "https://elevenlabs.io/",
+    icon: ICON,
     open: false,
     provider: "elevenlabs",
     routerModel: "eleven_flash_v2_5",

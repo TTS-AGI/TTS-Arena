@@ -85,12 +85,16 @@ services:
       ROUTER_API_KEY: ${ROUTER_API_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:3000}
       PORT: "3000"
+      AUDIO_CACHE_DIR: /audio-cache
+      AUDIO_LOG_DIR: /audio
     ports:
       - "${WEB_PORT:-3000}:3000"
     volumes:
       - .:/app
       - web-node-modules:/app/node_modules
       - web-next:/app/apps/web/.next
+      - web-audio-cache:/audio-cache
+      - web-audio-log:/audio
     command: >
       sh -c "bun install --frozen-lockfile &&
              cd apps/web &&
@@ -101,3 +105,5 @@ volumes:
   web-node-modules:
   router-node-modules:
   web-next:
+  web-audio-log:
+  web-audio-cache:

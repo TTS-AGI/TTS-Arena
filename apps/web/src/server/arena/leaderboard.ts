@@ -1,62 +1,63 @@
 /**
- * Leaderboard assembly.
+ * Leaderboard assembly — a hybrid of two rating systems, each used where it's
+ * strongest:
  *
- * Live ratings come from the Glicko-2 state on each model row (cheap, current).
- * The canonical ordering is a Bradley–Terry fit over all public outcomes with
- * bootstrap CIs, ranked by the CI lower bound — so a model shows up early (with
- * a wide interval) and "finalizes" as its interval tightens with more votes.
+ *   - < ESTABLISHED_THRESHOLD counted votes → live Glicko-2 (stable when data
+ *     is sparse), shown as "preliminary".
+ *   - >= ESTABLISHED_THRESHOLD               → the Bradley–Terry fit (the
+ *     principled global ranking once there's enough data), cached.
+ *
+ * Both ratings are centered on ~1500, so the single list is sorted by the
+ * displayed rating; preliminary rows are badged in the UI.
  */
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
-  bradleyTerry,
+  isEstablished,
   tierFor,
   type LeaderboardRow,
   type ModelType,
-  type Outcome,
 } from "@ttsa/shared";
 import { db } from "../db/client";
-import { models, votes } from "../db/schema";
+import { models } from "../db/schema";
+import { getBTRatings } from "./bt-cache";
 
 export async function getLeaderboard(
   type: ModelType,
 ): Promise<LeaderboardRow[]> {
-  // Public outcomes for this model type.
-  const outcomes = await db
-    .select({
-      winner: votes.chosenModelId,
-      loser: votes.rejectedModelId,
-    })
-    .from(votes)
-    .where(and(eq(votes.modelType, type), eq(votes.countsForPublic, true)));
+  const [typeModels, bt] = await Promise.all([
+    db.select().from(models).where(eq(models.modelType, type)),
+    getBTRatings(type),
+  ]);
 
-  const typeModels = await db
-    .select()
-    .from(models)
-    .where(eq(models.modelType, type));
-  const byId = new Map(typeModels.map((m) => [m.id, m]));
-  const ids = typeModels.map((m) => m.id);
-
-  const bt = bradleyTerry(ids, outcomes as Outcome[], 100);
-
-  // Only surface models with at least one counted match; the CI conveys
-  // confidence rather than a hard vote cutoff.
-  const rows: LeaderboardRow[] = [];
-  let rank = 0;
-  for (const r of bt) {
-    const m = byId.get(r.id);
-    if (!m || m.matchCount === 0) continue;
-    rank += 1;
-    rows.push({
-      rank,
-      id: m.id,
-      name: m.name,
-      url: m.url ?? "",
-      elo: Math.round(m.rating),
-      winRate: m.matchCount > 0 ? (m.winCount / m.matchCount) * 100 : 0,
-      totalVotes: m.matchCount,
-      tier: tierFor(rank),
-      open: m.isOpen,
+  // Build each row from the appropriate rating source.
+  const rows = typeModels
+    .filter((m) => m.matchCount > 0)
+    .map((m) => {
+      const established = isEstablished(m.matchCount);
+      const btRating = bt.get(m.id)?.rating;
+      // Established models use BT (fall back to Glicko if BT is somehow
+      // missing); preliminary models always use their live Glicko rating.
+      const rating =
+        established && btRating !== undefined ? btRating : m.rating;
+      return {
+        id: m.id,
+        name: m.name,
+        url: m.url ?? "",
+        icon: m.icon ?? null,
+        elo: Math.round(rating),
+        winRate: m.matchCount > 0 ? (m.winCount / m.matchCount) * 100 : 0,
+        totalVotes: m.matchCount,
+        open: m.isOpen,
+        preliminary: !established,
+      };
     });
-  }
-  return rows;
+
+  // One list, sorted by the displayed rating.
+  rows.sort((a, b) => b.elo - a.elo);
+
+  return rows.map((r, i) => ({
+    rank: i + 1,
+    tier: tierFor(i + 1),
+    ...r,
+  }));
 }

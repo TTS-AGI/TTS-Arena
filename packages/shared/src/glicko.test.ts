@@ -8,12 +8,24 @@ import {
 } from "./glicko";
 
 describe("glickoUpdate", () => {
-  test("a win raises rating and shrinks RD", () => {
+  test("a win raises rating by a modest, Elo-scale amount", () => {
     const player = defaultGlicko();
     const opp = defaultGlicko();
     const after = glickoUpdate(player, [{ opponent: opp, score: 1 }]);
     expect(after.rating).toBeGreaterThan(DEFAULT_RATING);
-    expect(after.rd).toBeLessThan(DEFAULT_RD);
+    // With the tuned initial RD (~60), one even win moves ~10 points — the
+    // same order of magnitude as Elo, not the >150 of the textbook RD=350.
+    expect(after.rating - DEFAULT_RATING).toBeLessThan(20);
+    // RD stays bounded (it equilibrates near its starting value, not exploding).
+    expect(after.rd).toBeLessThanOrEqual(DEFAULT_RD + 1);
+  });
+
+  test("from a high RD, a win does shrink RD (uncertainty tightens)", () => {
+    const player = { rating: 1500, rd: 350, vol: 0.06 };
+    const after = glickoUpdate(player, [
+      { opponent: defaultGlicko(), score: 1 },
+    ]);
+    expect(after.rd).toBeLessThan(350);
   });
 
   test("a loss lowers rating", () => {

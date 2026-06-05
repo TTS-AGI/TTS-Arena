@@ -26,6 +26,7 @@ async function seed() {
         isOpen: m.open,
         isActive: m.enabled,
         url: m.url,
+        icon: m.icon ?? null,
       })
       .onConflictDoUpdate({
         target: models.id,
@@ -35,6 +36,7 @@ async function seed() {
           isOpen: m.open,
           isActive: m.enabled,
           url: m.url,
+          icon: m.icon ?? null,
           updatedAt: new Date(),
         },
       });

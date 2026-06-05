@@ -68,8 +68,18 @@ export async function generateBattle(params: {
   const [modelA, modelB] = weightedPickTwo(catalog, await appearanceCounts());
 
   const [synthA, synthB] = await Promise.all([
-    synthesize({ text, provider: modelA.provider, model: modelA.routerModel }),
-    synthesize({ text, provider: modelB.provider, model: modelB.routerModel }),
+    synthesize({
+      text,
+      provider: modelA.provider,
+      model: modelA.routerModel,
+      includeRaw: true,
+    }),
+    synthesize({
+      text,
+      provider: modelB.provider,
+      model: modelB.routerModel,
+      includeRaw: true,
+    }),
   ]);
 
   return createSession({
@@ -82,12 +92,14 @@ export async function generateBattle(params: {
       voice: synthA.voice,
       audio: synthA.audio,
       extension: synthA.extension,
+      rawAudio: synthA.raw,
     },
     b: {
       modelId: modelB.id,
       voice: synthB.voice,
       audio: synthB.audio,
       extension: synthB.extension,
+      rawAudio: synthB.raw,
     },
   });
 }

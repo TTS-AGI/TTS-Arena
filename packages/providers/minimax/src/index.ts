@@ -22,29 +22,15 @@ import {
 } from "@ttsa/provider-sdk";
 
 const ENDPOINT = "https://api.minimaxi.chat/v1/t2a_v2";
-const DEFAULT_MODEL = "speech-02-hd";
+const DEFAULT_MODEL = "speech-2.6-hd";
 
 const MODELS: ProviderModel[] = [
-  {
-    id: "speech-02-hd",
-    name: "Hailuo Speech 02 HD",
-    description: "High-fidelity rhythm and stability",
-  },
-  {
-    id: "speech-02-turbo",
-    name: "Hailuo Speech 02 Turbo",
-    description: "Faster, multilingual",
-  },
-  {
-    id: "speech-01-hd",
-    name: "Hailuo Speech 01 HD",
-    description: "Rich, expressive voices",
-  },
-  {
-    id: "speech-01-turbo",
-    name: "Hailuo Speech 01 Turbo",
-    description: "Low latency",
-  },
+  { id: "speech-2.8-hd", name: "Hailuo Speech 2.8 HD" },
+  { id: "speech-2.8-turbo", name: "Hailuo Speech 2.8 Turbo" },
+  { id: "speech-2.6-hd", name: "Hailuo Speech 2.6 HD" },
+  { id: "speech-2.6-turbo", name: "Hailuo Speech 2.6 Turbo" },
+  { id: "speech-2.5-hd", name: "Hailuo Speech 2.5 HD" },
+  { id: "speech-2.5-turbo", name: "Hailuo Speech 2.5 Turbo" },
 ];
 
 // MiniMax exposes a large managed voice pool; this is a curated subset we
@@ -151,23 +137,67 @@ export const minimax: TTSProvider = {
 
 registerProvider(minimax);
 
+const ICON = "/logos/minimax.svg";
+
 registerArenaModels([
   {
-    id: "minimax-02-hd",
-    name: "MiniMax Speech-02-HD",
+    id: "minimax-speech-2.8-hd",
+    name: "MiniMax Speech 2.8 HD",
     url: "https://minimax.io/",
+    icon: ICON,
     open: false,
     provider: "minimax",
-    routerModel: "speech-02-hd",
+    routerModel: "speech-2.8-hd",
     enabled: true,
   },
   {
-    id: "minimax-02-turbo",
-    name: "MiniMax Speech-02-Turbo",
+    id: "minimax-speech-2.8-turbo",
+    name: "MiniMax Speech 2.8 Turbo",
     url: "https://minimax.io/",
+    icon: ICON,
     open: false,
     provider: "minimax",
-    routerModel: "speech-02-turbo",
+    routerModel: "speech-2.8-turbo",
+    enabled: true,
+  },
+  {
+    id: "minimax-speech-2.6-hd",
+    name: "MiniMax Speech 2.6 HD",
+    url: "https://minimax.io/",
+    icon: ICON,
+    open: false,
+    provider: "minimax",
+    routerModel: "speech-2.6-hd",
+    enabled: true,
+  },
+  {
+    id: "minimax-speech-2.6-turbo",
+    name: "MiniMax Speech 2.6 Turbo",
+    url: "https://minimax.io/",
+    icon: ICON,
+    open: false,
+    provider: "minimax",
+    routerModel: "speech-2.6-turbo",
+    enabled: true,
+  },
+  {
+    id: "minimax-speech-2.5-hd",
+    name: "MiniMax Speech 2.5 HD",
+    url: "https://minimax.io/",
+    icon: ICON,
+    open: false,
+    provider: "minimax",
+    routerModel: "speech-2.5-hd",
+    enabled: true,
+  },
+  {
+    id: "minimax-speech-2.5-turbo",
+    name: "MiniMax Speech 2.5 Turbo",
+    url: "https://minimax.io/",
+    icon: ICON,
+    open: false,
+    provider: "minimax",
+    routerModel: "speech-2.5-turbo",
     enabled: true,
   },
 ]);

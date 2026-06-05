@@ -9,6 +9,12 @@ export const routerTTSRequestSchema = z.object({
   text: z.string().min(1),
   provider: z.string().min(1),
   model: z.string().nullable().optional(),
+  /**
+   * When true, the response also includes the PRE-normalization audio
+   * (`rawAudioData`/`rawExtension`) so the caller can archive it for a future
+   * RLHF/preference dataset.
+   */
+  includeRaw: z.boolean().optional(),
 });
 export type RouterTTSRequest = z.infer<typeof routerTTSRequestSchema>;
 
@@ -19,8 +25,12 @@ export const routerTTSResponseSchema = z.object({
   model: z.string(),
   /** The voice the provider actually used (for per-voice arena stats). */
   voice: z.string(),
+  /** Normalized audio for playback. */
   audioData: z.string(), // base64
   extension: z.string(), // "mp3" | "wav" | ...
+  /** Pre-normalization audio (only when includeRaw was requested). */
+  rawAudioData: z.string().optional(),
+  rawExtension: z.string().optional(),
 });
 export type RouterTTSResponse = z.infer<typeof routerTTSResponseSchema>;
 

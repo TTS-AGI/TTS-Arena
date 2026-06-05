@@ -82,11 +82,16 @@ export const leaderboardRowSchema = z.object({
   id: z.string(),
   name: z.string(),
   url: z.string(),
+  /** Optional provider logo URL. */
+  icon: z.string().nullable(),
+  /** Displayed rating: Glicko-2 while preliminary, Bradley–Terry once established. */
   elo: z.number().int(),
   winRate: z.number(), // 0–100
   totalVotes: z.number().int(),
   tier: z.enum(["S", "A", "B"]).nullable(),
   open: z.boolean(),
+  /** True while the model has < ESTABLISHED_THRESHOLD counted votes. */
+  preliminary: z.boolean(),
 });
 export type LeaderboardRow = z.infer<typeof leaderboardRowSchema>;
 

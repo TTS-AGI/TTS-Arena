@@ -148,8 +148,9 @@ function Row({
         <span className="relative w-6" />
       )}
 
-      <div className="relative min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+      <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
+        <ModelLogo icon={model.icon} name={model.name} />
+        <div className="flex min-w-0 items-center gap-2">
           <a
             href={model.url}
             target="_blank"
@@ -163,13 +164,52 @@ function Row({
               OSS
             </span>
           )}
+          {model.preliminary && (
+            <span
+              title="Fewer than 300 votes — rating is provisional"
+              className="shrink-0 rounded-full bg-fill px-1.5 py-0.5 text-[0.6rem] font-medium text-ink-3"
+            >
+              preliminary
+            </span>
+          )}
         </div>
       </div>
 
       <div className="relative text-right">
-        <p className="nums text-base leading-none font-semibold">{value}</p>
+        <p
+          className={`nums text-base leading-none font-semibold ${
+            model.preliminary ? "text-ink-2" : ""
+          }`}
+        >
+          {value}
+        </p>
         <p className="tag mt-0.5">{valueLabel}</p>
       </div>
     </div>
+  );
+}
+
+/** Provider logo on the leaderboard, with a neutral placeholder fallback. */
+function ModelLogo({ icon, name }: { icon: string | null; name: string }) {
+  const [broken, setBroken] = useState(false);
+  if (icon && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={icon}
+        alt=""
+        aria-hidden
+        onError={() => setBroken(true)}
+        className="h-6 w-6 shrink-0 rounded-md object-contain"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-fill text-[0.6rem] font-semibold text-ink-3"
+    >
+      {name.slice(0, 1).toUpperCase()}
+    </span>
   );
 }

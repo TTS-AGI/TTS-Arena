@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:seed": "bun run src/server/db/seed.ts"
+    "db:seed": "bun run src/server/db/seed.ts",
+    "db:recompute": "bun run src/server/db/recompute-ratings.ts"
   },
   "dependencies": {
     "@base-ui-components/react": "1.0.0-beta.1",

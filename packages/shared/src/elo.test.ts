@@ -2,13 +2,24 @@ import { describe, expect, test } from "bun:test";
 import {
   BASE_ELO,
   ELO_K,
+  ESTABLISHED_THRESHOLD,
   RANK_THRESHOLD,
   applyElo,
   eloChange,
   expectedScore,
+  isEstablished,
   isRanked,
   tierFor,
 } from "./elo";
+
+describe("isEstablished", () => {
+  test("flips at the established threshold", () => {
+    expect(isEstablished(ESTABLISHED_THRESHOLD - 1)).toBe(false);
+    expect(isEstablished(ESTABLISHED_THRESHOLD)).toBe(true);
+    expect(isEstablished(0)).toBe(false);
+    expect(isEstablished(10_000)).toBe(true);
+  });
+});
 
 describe("constants match upstream", () => {
   test("base, k-factor, and ranking threshold", () => {

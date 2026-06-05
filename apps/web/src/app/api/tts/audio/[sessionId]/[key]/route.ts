@@ -6,7 +6,8 @@
  * others. 410 once the session has expired.
  */
 import { currentUser } from "@/server/auth/user";
-import { getSession } from "@/server/arena/session-store";
+import { getSession, getSideAudio } from "@/server/arena/session-store";
+import { readAudio } from "@/server/arena/audio-cache";
 
 const MIME: Record<string, string> = {
   mp3: "audio/mpeg",
@@ -28,18 +29,22 @@ export async function GET(
   const user = await currentUser();
   if (!user) return new Response("login required", { status: 401 });
 
-  const session = getSession(sessionId);
+  // Ownership check (also confirms the session is live).
+  const session = await getSession(sessionId);
   if (!session) return new Response("session expired", { status: 410 });
   if (session.userId !== user.id) {
     return new Response("forbidden", { status: 403 });
   }
 
-  const side = session[key];
-  const body = new Uint8Array(side.audio);
-  return new Response(body, {
+  const ref = await getSideAudio(sessionId, key);
+  if (!ref) return new Response("session expired", { status: 410 });
+  const audio = await readAudio(ref.path);
+  if (!audio) return new Response("audio unavailable", { status: 410 });
+
+  return new Response(new Uint8Array(audio), {
     headers: {
-      "Content-Type": MIME[side.extension] ?? "application/octet-stream",
-      "Content-Length": String(side.audio.byteLength),
+      "Content-Type": MIME[ref.extension] ?? "application/octet-stream",
+      "Content-Length": String(audio.byteLength),
       "Cache-Control": "no-store",
     },
   });

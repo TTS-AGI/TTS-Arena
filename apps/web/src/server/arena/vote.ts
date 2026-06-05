@@ -16,7 +16,7 @@ import {
   votes,
   type ModelRow,
 } from "../db/schema";
-import { isDatasetPrompt, markConsumed, isConsumed } from "./sentences";
+import { isDatasetPrompt, markConsumed } from "./sentences";
 import type { BattleSession } from "./session-store";
 
 export type VoteResult = {
@@ -36,9 +36,11 @@ export async function recordVote(
   const chosenSide = session[chosenKey];
   const rejectedSide = session[chosenKey === "a" ? "b" : "a"];
 
+  // Origin is still recorded (so custom-prompt votes can be down-weighted or
+  // audited later if gaming becomes a concern), but all votes currently count
+  // toward the public board — there's no dataset-prompt flow in the UI.
   const origin = isDatasetPrompt(session.text) ? "dataset" : "custom";
-  const counts =
-    origin === "dataset" ? !(await isConsumed(session.text)) : false;
+  const counts = true;
 
   await db.transaction(async (tx) => {
     // 1. Persist the vote.
@@ -52,6 +54,8 @@ export async function recordVote(
         rejectedModelId: rejectedSide.modelId,
         chosenVoice: chosenSide.voice,
         rejectedVoice: rejectedSide.voice,
+        chosenAudioPath: chosenSide.logPath,
+        rejectedAudioPath: rejectedSide.logPath,
         sentenceHash: session.sentenceHash,
         sentenceOrigin: origin,
         countsForPublic: counts,

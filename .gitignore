@@ -42,3 +42,7 @@ drizzle/meta/_journal.json.bak
 # local sqlite
 *.db
 *.sqlite
+
+# battle audio cache
+.audio-cache/
+**/.audio-cache/
