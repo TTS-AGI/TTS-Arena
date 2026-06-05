@@ -22,22 +22,18 @@ export function Account() {
     );
   }
 
-  const initials = user.name
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("");
-
   return (
     <div className="relative">
       <button
         onClick={() => setMenu((v) => !v)}
         className="flex items-center gap-2 rounded-full bg-fill py-1 pr-3 pl-1 transition-colors hover:bg-line"
       >
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-[0.65rem] font-semibold text-on-accent">
-          {initials}
-        </span>
-        <span className="text-sm font-medium">@{user.handle}</span>
+        <Avatar
+          src={user.avatarUrl}
+          username={user.username}
+          className="h-6 w-6 text-[0.65rem]"
+        />
+        <span className="text-sm font-medium">@{user.username}</span>
       </button>
 
       <AnimatePresence>
@@ -55,11 +51,15 @@ export function Account() {
               transition={SNAP}
               className="card absolute right-0 z-50 mt-2 w-48 p-1.5 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.3)]"
             >
-              <div className="px-2.5 py-2">
-                <p className="text-sm leading-tight font-semibold">
-                  {user.name}
+              <div className="flex items-center gap-2.5 px-2.5 py-2">
+                <Avatar
+                  src={user.avatarUrl}
+                  username={user.username}
+                  className="h-8 w-8 text-xs"
+                />
+                <p className="truncate text-sm leading-tight font-semibold">
+                  @{user.username}
                 </p>
-                <p className="tag">huggingface.co/{user.handle}</p>
               </div>
               <button
                 onClick={() => {
@@ -75,5 +75,38 @@ export function Account() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** HF avatar with an initials fallback (used when there's no URL or it fails). */
+function Avatar({
+  src,
+  username,
+  className = "",
+}: {
+  src: string | null;
+  username: string;
+  className?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const initials = username.slice(0, 2).toUpperCase();
+
+  if (src && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={username}
+        onError={() => setBroken(true)}
+        className={`shrink-0 rounded-full object-cover ${className}`}
+      />
+    );
+  }
+  return (
+    <span
+      className={`grid shrink-0 place-items-center rounded-full bg-accent font-semibold text-on-accent ${className}`}
+    >
+      {initials}
+    </span>
   );
 }

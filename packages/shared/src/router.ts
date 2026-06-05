@@ -37,3 +37,21 @@ export const routerProvidersResponseSchema = z.object({
 export type RouterProvidersResponse = z.infer<
   typeof routerProvidersResponseSchema
 >;
+
+/** An arena model as returned by the router's /models catalog. */
+export const arenaModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  icon: z.string().optional(),
+  open: z.boolean(),
+  provider: z.string(),
+  routerModel: z.string().nullable(),
+  enabled: z.boolean(),
+});
+export type ArenaModelDTO = z.infer<typeof arenaModelSchema>;
+
+export const routerModelsResponseSchema = z.object({
+  models: z.array(arenaModelSchema),
+});
+export type RouterModelsResponse = z.infer<typeof routerModelsResponseSchema>;

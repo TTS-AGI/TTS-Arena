@@ -5,6 +5,7 @@
  *   GET  /                       health/info
  *   GET  /providers              available provider ids
  *   GET  /providers/:id/models   models a provider exposes
+ *   GET  /models                 arena catalog (enabled + available)
  *   POST /tts                    synthesize { text, provider, model? }
  *
  * Auth: a single bearer key (ROUTER_API_KEY). When unset (local dev) auth is
@@ -13,6 +14,7 @@
 import { Hono } from "hono";
 import {
   ProviderError,
+  availableArenaModels,
   availableProviders,
   env,
   getProvider,
@@ -46,6 +48,10 @@ export function createApp() {
   app.get("/providers", (c) =>
     c.json({ providers: availableProviders().map((p) => p.id) }),
   );
+
+  // The authoritative arena catalog: enabled models whose provider is
+  // configured. The web app battles only over this list.
+  app.get("/models", (c) => c.json({ models: availableArenaModels() }));
 
   app.get("/providers/:id/models", async (c) => {
     const provider = getProvider(c.req.param("id"));

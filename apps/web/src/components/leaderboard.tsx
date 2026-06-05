@@ -1,34 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  rankedStandings,
-  tierFor,
-  RANK_THRESHOLD,
-  type Standing,
-} from "@/lib/models";
+import { useEffect, useMemo, useState } from "react";
+import type { LeaderboardResponse, LeaderboardRow } from "@ttsa/shared";
 
-type SortKey = "elo" | "winRate" | "matchCount";
+type SortKey = "elo" | "winRate" | "totalVotes";
 const SORTS: { key: SortKey; label: string }[] = [
-  { key: "elo", label: "Elo" },
+  { key: "elo", label: "Rating" },
   { key: "winRate", label: "Win rate" },
-  { key: "matchCount", label: "Votes" },
+  { key: "totalVotes", label: "Votes" },
 ];
 
 export function Leaderboard() {
   const [sort, setSort] = useState<SortKey>("elo");
+  const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
+  const [error, setError] = useState(false);
 
-  const ranked = useMemo(() => rankedStandings("tts"), []);
-  const rows = useMemo(() => {
-    // rank is always by elo; the sort only reorders the display
-    const withRank = ranked.map((m, i) => ({ ...m, rank: i + 1 }));
-    return [...withRank].sort((a, b) => b[sort] - a[sort]);
-  }, [ranked, sort]);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/leaderboard?type=tts")
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json() as Promise<LeaderboardResponse>;
+      })
+      .then((d) => active && setRows(d.rows))
+      .catch(() => active && setError(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sorted = useMemo(() => {
+    if (!rows) return [];
+    return [...rows].sort((a, b) => b[sort] - a[sort]);
+  }, [rows, sort]);
 
   const eloRange = useMemo(() => {
-    const elos = ranked.map((m) => m.elo);
+    if (!rows || rows.length === 0) return { min: 0, max: 1 };
+    const elos = rows.map((m) => m.elo);
     return { min: Math.min(...elos), max: Math.max(...elos) };
-  }, [ranked]);
+  }, [rows]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -37,8 +47,8 @@ export function Leaderboard() {
           Leaderboard
         </h1>
         <p className="mt-2 text-ink-2">
-          Elo from blind pairwise votes. Models need more than {RANK_THRESHOLD}{" "}
-          counted votes to be ranked.
+          Ratings from blind pairwise votes. New models appear quickly and
+          settle as the votes pile up.
         </p>
       </div>
 
@@ -64,34 +74,44 @@ export function Leaderboard() {
         </div>
       </div>
 
-      {/* List */}
-      <div className="card divide-y divide-line overflow-hidden">
-        {rows.map((m) => (
-          <Row
-            key={m.id}
-            model={m}
-            rank={m.rank}
-            sort={sort}
-            eloRange={eloRange}
-          />
-        ))}
-      </div>
+      {error ? (
+        <p className="text-center text-sm text-ink-3">
+          Couldn’t load the leaderboard.
+        </p>
+      ) : rows === null ? (
+        <p className="text-center text-sm text-ink-3">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-center text-sm text-ink-3">
+          No votes yet — be the first in the arena.
+        </p>
+      ) : (
+        <div className="card divide-y divide-line overflow-hidden">
+          {sorted.map((m, i) => (
+            <Row
+              key={m.id}
+              model={m}
+              displayRank={i + 1}
+              sort={sort}
+              eloRange={eloRange}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function Row({
   model,
-  rank,
+  displayRank,
   sort,
   eloRange,
 }: {
-  model: Standing & { rank: number };
-  rank: number;
+  model: LeaderboardRow;
+  displayRank: number;
   sort: SortKey;
   eloRange: { min: number; max: number };
 }) {
-  const tier = tierFor(rank);
   const eloFrac =
     (model.elo - eloRange.min) / (eloRange.max - eloRange.min || 1);
 
@@ -100,7 +120,9 @@ function Row({
       ? model.elo
       : sort === "winRate"
         ? `${model.winRate.toFixed(0)}%`
-        : `${(model.matchCount / 1000).toFixed(1)}k`;
+        : model.totalVotes >= 1000
+          ? `${(model.totalVotes / 1000).toFixed(1)}k`
+          : String(model.totalVotes);
   const valueLabel =
     sort === "elo" ? "rating" : sort === "winRate" ? "win rate" : "votes";
 
@@ -112,16 +134,15 @@ function Row({
       />
       <span
         className={`nums relative w-6 text-center text-sm font-semibold ${
-          rank <= 3 ? "text-accent" : "text-ink-4"
+          displayRank <= 3 ? "text-accent" : "text-ink-4"
         }`}
       >
-        {rank}
+        {displayRank}
       </span>
 
-      {/* Tier chip */}
-      {tier ? (
+      {model.tier ? (
         <span className="relative grid h-6 w-6 place-items-center rounded-md bg-ink text-[0.65rem] font-bold text-canvas">
-          {tier}
+          {model.tier}
         </span>
       ) : (
         <span className="relative w-6" />

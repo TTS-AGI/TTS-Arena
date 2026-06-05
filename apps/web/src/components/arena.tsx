@@ -1,66 +1,107 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import type { GenerateResponse, VoteResponse } from "@ttsa/shared";
 import { WaveformPlayer } from "./waveform-player";
 import { SNAP } from "./motion";
 import { useAuth } from "./auth";
-import { pickPair, PROMPTS, type TTSModel } from "@/lib/models";
 
 type Phase = "compose" | "generating" | "listen" | "revealed";
 type Side = "a" | "b";
 const MAX_LEN = 1000;
 
+type Battle = {
+  sessionId: string;
+  audioA: string;
+  audioB: string;
+};
+
+type RevealedModel = VoteResponse["chosen"];
+
+/** Resolve a side's revealed model: the winning side shows `chosen`. */
+function modelForSide(
+  side: Side,
+  winner: Side | null,
+  reveal: VoteResponse | null,
+): RevealedModel | null {
+  if (!reveal || !winner) return null;
+  return side === winner ? reveal.chosen : reveal.rejected;
+}
+
 export function Arena() {
   const { requireAuth } = useAuth();
-  const counter = useRef(0);
 
-  const [text, setText] = useState(PROMPTS[0]);
+  const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("compose");
-  const [pair, setPair] = useState<[TTSModel, TTSModel] | null>(null);
-  const [seed, setSeed] = useState("b0");
+  const [battle, setBattle] = useState<Battle | null>(null);
   const [winner, setWinner] = useState<Side | null>(null);
+  const [reveal, setReveal] = useState<VoteResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  const trimmed = text.trim();
   const overLimit = text.length > MAX_LEN;
-  const canGenerate = text.trim().length > 0 && !overLimit;
-
-  function randomize() {
-    let next = text;
-    while (next === text && PROMPTS.length > 1) {
-      next = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
-    }
-    setText(next);
-  }
+  const canGenerate = trimmed.length > 0 && !overLimit;
 
   async function generate() {
-    if (!canGenerate) return;
-    if (!(await requireAuth())) return; // login required to generate
-
-    counter.current += 1;
-    const s = `tts-${counter.current}`; // always a defined string
-    setSeed(s);
+    if (!canGenerate || !requireAuth()) return;
+    setError(null);
     setWinner(null);
-    setPair(null);
+    setReveal(null);
+    setBattle(null);
     setPhase("generating");
-
-    // Simulate the backend round-trip (real arena generates two clips).
-    window.setTimeout(() => {
-      setPair(pickPair("tts", s));
+    try {
+      const res = await fetch("/api/tts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "generation failed");
+      }
+      const data = (await res.json()) as GenerateResponse;
+      setBattle({
+        sessionId: data.sessionId,
+        audioA: data.audioA,
+        audioB: data.audioB,
+      });
       setPhase("listen");
-    }, 1200);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setPhase("compose");
+    }
   }
 
-  // Binary vote only — no tie / skip, exactly like the real arena.
   async function vote(side: Side) {
-    if (!(await requireAuth())) return;
+    if (!battle || !requireAuth()) return;
+    const prev = phase;
     setWinner(side);
     setPhase("revealed");
+    try {
+      const res = await fetch("/api/tts/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: battle.sessionId, chosen: side }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "vote failed");
+      }
+      setReveal((await res.json()) as VoteResponse);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Vote failed.");
+      setWinner(null);
+      setPhase(prev);
+    }
   }
 
   function reset() {
     setPhase("compose");
-    setPair(null);
+    setBattle(null);
     setWinner(null);
+    setReveal(null);
+    setError(null);
   }
 
   const busy = phase === "generating";
@@ -72,8 +113,8 @@ export function Arena() {
           Which voice sounds more human?
         </h1>
         <p className="mx-auto mt-2 max-w-md text-balance text-ink-2">
-          Pick the better of two anonymous models. Every vote feeds the Elo
-          leaderboard.
+          Hear the same line from two anonymous models and pick the better one.
+          Names are revealed only after you vote.
         </p>
       </div>
 
@@ -84,44 +125,40 @@ export function Arena() {
           rows={2}
           onChange={(e) => setText(e.target.value)}
           disabled={phase !== "compose"}
-          placeholder="Type something to synthesize…"
+          placeholder="Type a line for both models to speak…"
           className="w-full resize-none bg-transparent px-5 pt-5 text-lg leading-relaxed outline-none disabled:opacity-55"
         />
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-2 pb-4">
-          <button
-            onClick={() => phase === "compose" && randomize()}
-            disabled={phase !== "compose"}
-            className="flex items-center gap-1.5 rounded-full bg-fill px-3 py-1.5 text-xs font-medium text-ink-2 transition-colors hover:bg-line hover:text-ink disabled:opacity-40"
-          >
-            <ShuffleIcon /> Random line
-          </button>
-          <div className="flex items-center gap-3">
-            <span className={`tag ${overLimit ? "text-accent" : ""}`}>
-              {text.length}/{MAX_LEN}
-            </span>
-            {phase === "compose" ? (
-              <button
-                onClick={generate}
-                disabled={!canGenerate}
-                className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
-              >
-                Synthesize →
-              </button>
-            ) : (
-              <button
-                onClick={reset}
-                disabled={busy}
-                className="rounded-full bg-fill px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
-              >
-                ↺ New round
-              </button>
-            )}
-          </div>
+        <div className="flex items-center justify-end gap-3 px-4 pt-2 pb-4">
+          <span className={`tag ${overLimit ? "text-accent" : ""}`}>
+            {text.length}/{MAX_LEN}
+          </span>
+          {phase === "compose" ? (
+            <button
+              onClick={generate}
+              disabled={!canGenerate}
+              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
+            >
+              Synthesize →
+            </button>
+          ) : (
+            <button
+              onClick={reset}
+              disabled={busy}
+              className="rounded-full bg-fill px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
+            >
+              ↺ New round
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Battle area — the grid persists across busy→listen so cards just
-          swap in place (no skeleton→cards slide). Only its first mount fades. */}
+      {error && (
+        <p className="text-center text-sm text-accent" role="alert">
+          {error}
+        </p>
+      )}
+
+      {/* Battle area */}
       <AnimatePresence>
         {phase !== "compose" && (
           <motion.div
@@ -131,7 +168,7 @@ export function Arena() {
             transition={SNAP}
             className="grid gap-4 sm:grid-cols-2"
           >
-            {busy || !pair ? (
+            {busy || !battle ? (
               <>
                 <LoadingCard side="A" />
                 <LoadingCard side="B" />
@@ -140,18 +177,18 @@ export function Arena() {
               <>
                 <Contestant
                   side="a"
-                  model={pair[0]}
-                  seed={`${seed}-a`}
+                  src={battle.audioA}
                   phase={phase}
                   winner={winner}
+                  model={modelForSide("a", winner, reveal)}
                   onVote={() => vote("a")}
                 />
                 <Contestant
                   side="b"
-                  model={pair[1]}
-                  seed={`${seed}-b`}
+                  src={battle.audioB}
                   phase={phase}
                   winner={winner}
+                  model={modelForSide("b", winner, reveal)}
                   onVote={() => vote("b")}
                 />
               </>
@@ -160,9 +197,9 @@ export function Arena() {
         )}
       </AnimatePresence>
 
-      {/* Result (binary — no tie) */}
+      {/* Result */}
       <AnimatePresence>
-        {phase === "revealed" && pair && (
+        {phase === "revealed" && reveal && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -171,12 +208,13 @@ export function Arena() {
           >
             <span className="tag">Result</span>
             <p className="text-xl font-semibold">
-              You preferred {(winner === "a" ? pair[0] : pair[1]).name}.
+              You preferred {reveal.chosen.name}.
             </p>
             <p className="text-sm text-ink-2">
-              over {(winner === "a" ? pair[1] : pair[0]).name} · Elo updated.{" "}
+              over {reveal.rejected.name}
+              {reveal.counted ? " · ratings updated" : ""}.{" "}
               <button onClick={reset} className="font-medium text-accent">
-                Vote again →
+                Go again →
               </button>
             </p>
           </motion.div>
@@ -186,7 +224,7 @@ export function Arena() {
   );
 }
 
-/* ── Skeleton shown while "generating" ───────────────────────────────── */
+/* ── Skeleton shown while generating ─────────────────────────────────── */
 function LoadingCard({ side }: { side: string }) {
   return (
     <div className="card flex flex-col gap-5 p-5">
@@ -198,7 +236,6 @@ function LoadingCard({ side }: { side: string }) {
           <Spinner /> Synthesizing…
         </span>
       </div>
-      {/* shimmering placeholder bars */}
       <div className="flex h-10 items-center gap-[3px]">
         {Array.from({ length: 56 }).map((_, i) => (
           <motion.span
@@ -222,17 +259,17 @@ function LoadingCard({ side }: { side: string }) {
 /* ── A contestant card (anonymous until revealed) ────────────────────── */
 function Contestant({
   side,
-  model,
-  seed,
+  src,
   phase,
   winner,
+  model,
   onVote,
 }: {
   side: Side;
-  model: TTSModel;
-  seed: string;
+  src: string;
   phase: Phase;
   winner: Side | null;
+  model: RevealedModel | null;
   onVote: () => void;
 }) {
   const revealed = phase === "revealed";
@@ -248,7 +285,7 @@ function Contestant({
             {label}
           </span>
           <AnimatePresence mode="wait">
-            {revealed ? (
+            {revealed && model ? (
               <motion.div
                 key="name"
                 initial={{ opacity: 0, x: -6 }}
@@ -283,7 +320,7 @@ function Contestant({
         )}
       </div>
 
-      <WaveformPlayer seed={seed} />
+      <WaveformPlayer src={src} />
 
       {!revealed && (
         <button
@@ -300,21 +337,5 @@ function Contestant({
 function Spinner() {
   return (
     <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-  );
-}
-
-function ShuffleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-3.5 w-3.5"
-    >
-      <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-    </svg>
   );
 }

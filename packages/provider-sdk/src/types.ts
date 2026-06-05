@@ -17,6 +17,33 @@ export type ProviderModel = {
   description?: string;
 };
 
+/**
+ * An arena-facing model entry — the catalog the arena battles over.
+ *
+ * `id` is a stable slug and the ONLY identity that persists: ratings, votes,
+ * and history key on it. Everything else is mutable display/routing metadata,
+ * so a model can be renamed, re-iconed, re-pointed to another provider, or
+ * toggled on/off without losing its history.
+ */
+export type ArenaModel = {
+  /** Permanent slug, e.g. "eleven-multilingual-v2". Never change this. */
+  id: string;
+  /** Display name (mutable). */
+  name: string;
+  /** Maker/info URL (mutable). */
+  url: string;
+  /** Optional icon/logo URL (mutable). */
+  icon?: string;
+  /** Open-weights flag. */
+  open: boolean;
+  /** Provider id that synthesizes this model. */
+  provider: string;
+  /** Provider-specific model id (null = provider default). */
+  routerModel: string | null;
+  /** Whether the model is live in the arena. */
+  enabled: boolean;
+};
+
 export type SynthesizeInput = {
   text: string;
   /** Provider-specific model id; null/undefined means the provider default. */

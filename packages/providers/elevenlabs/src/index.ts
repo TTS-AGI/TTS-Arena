@@ -12,6 +12,7 @@ import {
   env,
   httpFetch,
   pickRandom,
+  registerArenaModels,
   registerProvider,
   toBase64,
   type ProviderModel,
@@ -138,3 +139,33 @@ export const elevenlabs: TTSProvider = {
 };
 
 registerProvider(elevenlabs);
+
+registerArenaModels([
+  {
+    id: "eleven-multilingual-v2",
+    name: "Eleven Multilingual v2",
+    url: "https://elevenlabs.io/",
+    open: false,
+    provider: "elevenlabs",
+    routerModel: "eleven_multilingual_v2",
+    enabled: true,
+  },
+  {
+    id: "eleven-turbo-v2.5",
+    name: "Eleven Turbo v2.5",
+    url: "https://elevenlabs.io/",
+    open: false,
+    provider: "elevenlabs",
+    routerModel: "eleven_turbo_v2_5",
+    enabled: true,
+  },
+  {
+    id: "eleven-flash-v2.5",
+    name: "Eleven Flash v2.5",
+    url: "https://elevenlabs.io/",
+    open: false,
+    provider: "elevenlabs",
+    routerModel: "eleven_flash_v2_5",
+    enabled: true,
+  },
+]);

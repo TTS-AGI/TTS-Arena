@@ -1,0 +1,103 @@
+# Local development stack: Postgres + TTS router + web app, with hot reload.
+#
+#   docker compose up
+#
+# Source is mounted for live reload; deps live in an image-owned volume so the
+# host's node_modules never shadows them. The `migrate` one-shot applies the
+# schema and seeds models before web/router come up.
+#
+# Secrets come from two files you fill in (both gitignored):
+#   .env                      — compose-level (DB creds, ports, router key)
+#   .env.development.local    — app secrets (HF OAuth, provider API keys)
+
+name: tts-arena
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-arena}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena}
+      POSTGRES_DB: ${POSTGRES_DB:-tts_arena}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arena}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: apply migrations and seed the model registry, then exit.
+  migrate:
+    image: oven/bun:1.1.42
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD:-arena}@db:5432/${POSTGRES_DB:-tts_arena}
+    volumes:
+      - .:/app
+      - web-node-modules:/app/node_modules
+    command: >
+      sh -c "bun install --frozen-lockfile &&
+             cd apps/web &&
+             bunx drizzle-kit migrate &&
+             bun run src/server/db/seed.ts"
+
+  router:
+    image: oven/bun:1.1.42
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.development.local
+    environment:
+      PORT: "8080"
+      ROUTER_API_KEY: ${ROUTER_API_KEY:-}
+    ports:
+      - "${ROUTER_PORT:-8080}:8080"
+    volumes:
+      - .:/app
+      - router-node-modules:/app/node_modules
+    command: >
+      sh -c "apt-get update && apt-get install -y --no-install-recommends ffmpeg >/dev/null 2>&1;
+             bun install --frozen-lockfile &&
+             bun --watch apps/router/src/index.ts"
+
+  web:
+    image: oven/bun:1.1.42
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env.development.local
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD:-arena}@db:5432/${POSTGRES_DB:-tts_arena}
+      ROUTER_URL: http://router:8080
+      ROUTER_API_KEY: ${ROUTER_API_KEY:-}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      PORT: "3000"
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - web-node-modules:/app/node_modules
+      - web-next:/app/apps/web/.next
+    command: >
+      sh -c "bun install --frozen-lockfile &&
+             cd apps/web &&
+             bun run dev --hostname 0.0.0.0 --port 3000"
+
+volumes:
+  db-data:
+  web-node-modules:
+  router-node-modules:
+  web-next:

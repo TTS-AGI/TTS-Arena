@@ -1,36 +1,26 @@
-"use client";
-
-import { useState } from "react";
-import { Switch } from "@base-ui-components/react/switch";
-import { useAuth } from "./auth";
-
 const STEPS = [
-  {
-    n: "01",
-    t: "Type",
-    d: "Enter a line, or pull a random one from the prompt set.",
-  },
+  { n: "01", t: "Type", d: "Write any line you want to hear spoken aloud." },
   { n: "02", t: "Listen", d: "Two anonymous models — A and B — read it back." },
   {
     n: "03",
     t: "Vote",
-    d: "Pick the one that sounds more human. No ties, no skips.",
+    d: "Pick the one that sounds more human. One choice, no skips.",
   },
-  { n: "04", t: "Rank", d: "Each vote nudges both models' Elo, like chess." },
+  {
+    n: "04",
+    t: "Rank",
+    d: "Your vote updates both models' ratings in real time.",
+  },
 ];
 
 const RULES = [
-  "Sign in with Hugging Face to generate and vote — accounts must be ≥30 days old.",
-  "TTS prompts are English-only and capped at 1,000 characters.",
+  "Sign in with Hugging Face to vote — accounts must be at least 30 days old.",
+  "Prompts are English-only for now and capped at 1,000 characters.",
   "Models stay anonymous until you've voted; only then are A and B revealed.",
-  "A model needs more than 250 counted votes before it appears on the board.",
+  "Ratings use Glicko-2 live, with a Bradley–Terry fit settling the board over time.",
 ];
 
 export function About() {
-  const { user } = useAuth();
-  // Mirrors the real "show me on the leaderboard" toggle (per-account).
-  const [listed, setListed] = useState(true);
-
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
@@ -38,8 +28,8 @@ export function About() {
           A benchmark you can hear.
         </h1>
         <p className="mx-auto mt-2 max-w-md text-balance text-ink-2">
-          TTS Arena ranks text-to-speech and conversational models the only way
-          that really matters — by ear, in a blind head-to-head.
+          TTS Arena ranks text-to-speech models the only way that really matters
+          — by ear, in a blind head-to-head.
         </p>
       </div>
 
@@ -67,25 +57,6 @@ export function About() {
           ))}
         </ul>
       </div>
-
-      {/* Per-account leaderboard visibility — signed-in users only */}
-      {user && (
-        <div className="card flex items-center justify-between p-4">
-          <div>
-            <p className="font-medium">Show me on the top-voters board</p>
-            <p className="text-sm text-ink-2">
-              Appear publicly in the voter rankings.
-            </p>
-          </div>
-          <Switch.Root
-            checked={listed}
-            onCheckedChange={setListed}
-            className="relative h-7 w-12 cursor-pointer rounded-full bg-line-2 px-0.5 transition-colors data-[checked]:bg-accent"
-          >
-            <Switch.Thumb className="block h-6 w-6 translate-x-0 rounded-full bg-surface shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] data-[checked]:translate-x-5" />
-          </Switch.Root>
-        </div>
-      )}
     </div>
   );
 }

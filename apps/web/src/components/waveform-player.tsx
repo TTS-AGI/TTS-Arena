@@ -1,69 +1,67 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useAnimationFrame } from "motion/react";
-import { makeWaveform } from "@/lib/models";
+import WaveSurfer from "wavesurfer.js";
 
 /**
- * Mocked player. Soft rounded bars; pressing play sweeps a playhead across
- * them over `duration`s. Played bars take the accent; the rest stay quiet.
- * No real audio — purely a visual scaffold.
+ * Real audio player built on Wavesurfer.js. Renders the decoded waveform of a
+ * remote clip and plays it with a click. Themed to the design tokens; the
+ * played portion takes the accent.
  */
-export function WaveformPlayer({
-  seed,
-  duration = 4.2,
-  bars = 56,
-}: {
-  seed: string;
-  duration?: number;
-  bars?: number;
-}) {
-  const amps = makeWaveform(seed, bars);
+export function WaveformPlayer({ src }: { src: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WaveSurfer | null>(null);
+  const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const startRef = useRef(0);
-  const bankedRef = useRef(0);
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    setPlaying(false);
-    setProgress(0);
-    bankedRef.current = 0;
-    startRef.current = 0;
-  }, [seed]);
+    if (!containerRef.current) return;
+    const styles = getComputedStyle(document.documentElement);
+    const ink3 = styles.getPropertyValue("--color-line-2").trim() || "#ccc";
+    const accent =
+      styles.getPropertyValue("--color-accent").trim() || "#5b5bd6";
 
-  useAnimationFrame((t) => {
-    if (!playing) return;
-    if (startRef.current === 0) startRef.current = t;
-    const elapsed = bankedRef.current + (t - startRef.current) / 1000;
-    const p = Math.min(1, elapsed / duration);
-    setProgress(p);
-    if (p >= 1) {
+    const ws = WaveSurfer.create({
+      container: containerRef.current,
+      height: 40,
+      waveColor: ink3,
+      progressColor: accent,
+      cursorWidth: 0,
+      barWidth: 3,
+      barGap: 2,
+      barRadius: 3,
+      normalize: true,
+      url: src,
+    });
+    wsRef.current = ws;
+
+    ws.on("ready", () => setReady(true));
+    ws.on("play", () => setPlaying(true));
+    ws.on("pause", () => setPlaying(false));
+    ws.on("finish", () => {
       setPlaying(false);
-      bankedRef.current = 0;
-      startRef.current = 0;
-      setProgress(0);
-    }
-  });
+      setElapsed(0);
+    });
+    ws.on("timeupdate", (t) => setElapsed(t));
+
+    return () => {
+      ws.destroy();
+      wsRef.current = null;
+    };
+  }, [src]);
 
   function toggle() {
-    if (playing) {
-      bankedRef.current += (performance.now() - startRef.current) / 1000;
-      startRef.current = 0;
-      setPlaying(false);
-    } else {
-      startRef.current = 0;
-      setPlaying(true);
-    }
+    wsRef.current?.playPause();
   }
-
-  const elapsedSec = (progress * duration).toFixed(1);
 
   return (
     <div className="flex items-center gap-4">
       <button
         onClick={toggle}
+        disabled={!ready}
         aria-label={playing ? "Pause" : "Play"}
-        className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-ink text-canvas transition-transform active:scale-95"
+        className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-ink text-canvas transition-transform active:scale-95 disabled:opacity-40"
       >
         {playing ? (
           <span className="flex gap-[3px]">
@@ -75,34 +73,10 @@ export function WaveformPlayer({
         )}
       </button>
 
-      <div className="flex h-10 flex-1 items-center gap-[3px]" aria-hidden>
-        {amps.map((a, i) => {
-          const reached = i / (bars - 1) <= progress;
-          return (
-            <motion.span
-              key={i}
-              className="min-h-[10%] flex-1 rounded-full"
-              style={{
-                height: `${Math.round(a * 100)}%`,
-                backgroundColor: reached
-                  ? "var(--color-accent)"
-                  : "var(--color-line-2)",
-              }}
-              animate={
-                playing && reached ? { scaleY: [1, 1.1, 1] } : { scaleY: 1 }
-              }
-              transition={{
-                duration: 0.5,
-                repeat: playing && reached ? Infinity : 0,
-                delay: (i % 6) * 0.05,
-              }}
-            />
-          );
-        })}
-      </div>
+      <div ref={containerRef} className="h-10 flex-1" />
 
       <span className="nums w-9 shrink-0 text-right font-mono text-xs text-ink-3">
-        {elapsedSec}s
+        {elapsed.toFixed(1)}s
       </span>
     </div>
   );

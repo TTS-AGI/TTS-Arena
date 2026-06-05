@@ -4,5 +4,7 @@
  */
 export * from "./models";
 export * from "./elo";
+export * from "./glicko";
+export * from "./bradley-terry";
 export * from "./api";
 export * from "./router";

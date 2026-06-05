@@ -13,6 +13,7 @@ export const userSchema = z.object({
   id: z.number().int(),
   username: z.string(),
   hfId: z.string(),
+  avatarUrl: z.string().nullable(),
   showInLeaderboard: z.boolean(),
   isAdmin: z.boolean(),
 });

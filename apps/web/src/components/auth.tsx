@@ -10,85 +10,68 @@ import {
 } from "react";
 import { Dialog } from "@base-ui-components/react/dialog";
 import { AnimatePresence, motion } from "motion/react";
+import type { ApiUser, MeResponse } from "@ttsa/shared";
 import { MODAL_IN, MODAL_OUT } from "./motion";
 import { HFLogo } from "./hf-logo";
 
 /**
- * Mocked "Sign in with Hugging Face" auth. No real OAuth — this is a frontend
- * scaffold. A successful sign-in simulates the redirect round-trip and persists
- * a fake user to localStorage so generating and voting can be gated on it.
+ * Real Hugging Face auth, backed by /api/auth/*. `requireAuth` opens a sign-in
+ * dialog whose primary action navigates to the OAuth flow; on return, `/me`
+ * rehydrates the session. Generating and voting call `requireAuth` first.
  */
 
-export type HFUser = { name: string; handle: string };
-
 type AuthCtx = {
-  user: HFUser | null;
-  /** Open the sign-in dialog. Resolves true once signed in, false if dismissed. */
-  requireAuth: () => Promise<boolean>;
-  signOut: () => void;
+  user: ApiUser | null;
+  loading: boolean;
+  /** Ensure the user is signed in; returns true if already authenticated. */
+  requireAuth: () => boolean;
+  signOut: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-// Placeholder identity returned by the mocked sign-in (no real OAuth).
-const FAKE_USER: HFUser = { name: "Demo User", handle: "demo-user" };
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<HFUser | null>(null);
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [resolver, setResolver] = useState<((ok: boolean) => void) | null>(
-    null,
-  );
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("hf-user");
-      if (raw) setUser(JSON.parse(raw));
-    } catch {}
+    let active = true;
+    fetch("/api/auth/me")
+      .then((r) => r.json() as Promise<MeResponse>)
+      .then((d) => {
+        if (active) setUser(d.user);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const requireAuth = useCallback(
-    () =>
-      new Promise<boolean>((resolve) => {
-        if (user) return resolve(true);
-        setResolver(() => resolve);
-        setOpen(true);
-      }),
-    [user],
-  );
+  const requireAuth = useCallback((): boolean => {
+    if (user) return true;
+    setOpen(true);
+    return false;
+  }, [user]);
 
-  function close(ok: boolean) {
-    setOpen(false);
-    setPending(false);
-    resolver?.(ok);
-    setResolver(null);
-  }
-
-  function signIn() {
-    setPending(true);
-    // Simulate the OAuth redirect round-trip.
-    window.setTimeout(() => {
-      setUser(FAKE_USER);
-      try {
-        localStorage.setItem("hf-user", JSON.stringify(FAKE_USER));
-      } catch {}
-      close(true);
-    }, 900);
-  }
-
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setUser(null);
-    try {
-      localStorage.removeItem("hf-user");
-    } catch {}
   }, []);
+
+  function startLogin() {
+    // Full-page redirect into the OAuth flow; we return to the app afterwards.
+    window.location.href = "/api/auth/login";
+  }
 
   return (
-    <Ctx.Provider value={{ user, requireAuth, signOut }}>
+    <Ctx.Provider value={{ user, loading, requireAuth, signOut }}>
       {children}
 
-      <Dialog.Root open={open} onOpenChange={(o) => !o && close(false)}>
+      <Dialog.Root open={open} onOpenChange={setOpen}>
         <AnimatePresence>
           {open && (
             <Dialog.Portal keepMounted>
@@ -125,28 +108,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   Sign in to vote
                 </Dialog.Title>
                 <Dialog.Description className="mx-auto mt-1.5 max-w-[18rem] text-sm leading-relaxed text-ink-2">
-                  Generating and voting are tied to your Hugging Face account,
-                  so every vote counts once. Accounts must be at least 30 days
-                  old.
+                  Voting is tied to your Hugging Face account so every vote
+                  counts once. Accounts must be at least 30 days old.
                 </Dialog.Description>
 
                 <button
-                  onClick={signIn}
-                  disabled={pending}
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#ff9d00] px-4 py-2.5 text-sm font-semibold text-[#3a2a00] transition-opacity hover:opacity-90 disabled:opacity-70"
+                  onClick={startLogin}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#ff9d00] px-4 py-2.5 text-sm font-semibold text-[#3a2a00] transition-opacity hover:opacity-90"
                 >
-                  {pending ? (
-                    <>
-                      <Spinner /> Connecting…
-                    </>
-                  ) : (
-                    <>
-                      <HFLogo className="h-4 w-4" /> Continue with Hugging Face
-                    </>
-                  )}
+                  <HFLogo className="h-4 w-4" /> Continue with Hugging Face
                 </button>
                 <button
-                  onClick={() => close(false)}
+                  onClick={() => setOpen(false)}
                   className="mt-2 w-full rounded-full px-4 py-2 text-sm text-ink-3 transition-colors hover:text-ink"
                 >
                   Not now
@@ -157,12 +130,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         </AnimatePresence>
       </Dialog.Root>
     </Ctx.Provider>
-  );
-}
-
-function Spinner() {
-  return (
-    <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
   );
 }
 

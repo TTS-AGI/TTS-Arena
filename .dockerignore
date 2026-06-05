@@ -1,0 +1,24 @@
+# deps & build output (installed/built inside the image)
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+out
+**/out
+
+# vcs & local
+.git
+.github
+*.tsbuildinfo
+
+# env & secrets — never bake into images
+.env
+.env.*
+**/.env
+**/.env.*
+
+# misc
+.DS_Store
+*.log

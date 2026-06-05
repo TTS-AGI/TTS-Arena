@@ -12,6 +12,7 @@ import {
   env,
   httpFetch,
   pickRandom,
+  registerArenaModels,
   registerProvider,
   toBase64,
   type ProviderModel,
@@ -149,3 +150,24 @@ export const minimax: TTSProvider = {
 };
 
 registerProvider(minimax);
+
+registerArenaModels([
+  {
+    id: "minimax-02-hd",
+    name: "MiniMax Speech-02-HD",
+    url: "https://minimax.io/",
+    open: false,
+    provider: "minimax",
+    routerModel: "speech-02-hd",
+    enabled: true,
+  },
+  {
+    id: "minimax-02-turbo",
+    name: "MiniMax Speech-02-Turbo",
+    url: "https://minimax.io/",
+    open: false,
+    provider: "minimax",
+    routerModel: "speech-02-turbo",
+    enabled: true,
+  },
+]);

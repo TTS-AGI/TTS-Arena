@@ -6,6 +6,7 @@ import { Segmented, type ViewId } from "@/components/segmented";
 import { SystemTheme } from "@/components/system-theme";
 import { AuthProvider } from "@/components/auth";
 import { Account } from "@/components/account";
+import { DiscordBanner } from "@/components/discord-banner";
 import { Arena } from "@/components/arena";
 import { Leaderboard } from "@/components/leaderboard";
 import { About } from "@/components/about";
@@ -42,6 +43,7 @@ export default function Home() {
     <AuthProvider>
       <SystemTheme />
       <div className="min-h-dvh overflow-x-hidden">
+        <DiscordBanner />
         {/* Top bar */}
         <header className="sticky top-0 z-40 bg-canvas/75 backdrop-blur-xl">
           <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
