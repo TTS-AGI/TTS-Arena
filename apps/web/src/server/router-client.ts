@@ -22,24 +22,50 @@ export async function synthesize(params: {
   includeRaw?: boolean;
 }): Promise<Synthesized> {
   const apiKey = serverEnv.router.apiKey();
-  const res = await fetch(`${serverEnv.router.url()}/tts`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-    },
-    body: JSON.stringify({
-      text: params.text,
+  const url = `${serverEnv.router.url()}/tts`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        text: params.text,
+        provider: params.provider,
+        model: params.model,
+        includeRaw: params.includeRaw,
+      }),
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch (err) {
+    // Network-level failure (router down, DNS, timeout) — fetch rejects with no
+    // status, so name the provider/model and re-throw a descriptive error.
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error("[router] request failed", {
+      url,
       provider: params.provider,
       model: params.model,
-      includeRaw: params.includeRaw,
-    }),
-    signal: AbortSignal.timeout(90_000),
-  });
+      reason,
+    });
+    throw new Error(
+      `Router request failed for ${params.provider}/${params.model ?? "default"}: ${reason}`,
+    );
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`Router ${res.status}: ${detail.slice(0, 200)}`);
+    console.error("[router] non-OK response", {
+      url,
+      provider: params.provider,
+      model: params.model,
+      status: res.status,
+      detail: detail.slice(0, 500),
+    });
+    throw new Error(
+      `Router ${res.status} for ${params.provider}/${params.model ?? "default"}: ${detail.slice(0, 200)}`,
+    );
   }
 
   const json = routerTTSResponseSchema.parse(await res.json());

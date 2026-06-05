@@ -71,7 +71,7 @@ export async function sentenceStats(): Promise<{
 }> {
   const [total, rows] = await Promise.all([
     promptCount(),
-    db.select({ count: sql<number>`count(*)::int` }).from(consumedSentences),
+    db.select({ count: sql<number>`count(*)` }).from(consumedSentences),
   ]);
   const consumed = Math.min(total, rows[0]?.count ?? 0);
   return {

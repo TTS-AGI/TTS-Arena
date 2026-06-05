@@ -1,8 +1,9 @@
 {
   "name": "tts-arena",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
+  "license": "Apache-2.0",
   "workspaces": [
     "apps/*",
     "packages/*",

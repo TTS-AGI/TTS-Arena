@@ -2,10 +2,15 @@
 
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { GenerateResponse, VoteResponse } from "@ttsa/shared";
+import type {
+  GenerateResponse,
+  RandomSentenceResponse,
+  VoteResponse,
+} from "@ttsa/shared";
 import { WaveformPlayer, type WaveformHandle } from "./waveform-player";
 import { SNAP } from "./motion";
 import { useAuth } from "./auth";
+import { useToast } from "./toast";
 
 type Phase = "compose" | "generating" | "listen" | "revealed";
 type Side = "a" | "b";
@@ -33,13 +38,14 @@ function modelForSide(
 
 export function Arena() {
   const { requireAuth } = useAuth();
+  const toast = useToast();
 
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("compose");
   const [battle, setBattle] = useState<Battle | null>(null);
   const [winner, setWinner] = useState<Side | null>(null);
   const [reveal, setReveal] = useState<VoteResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [randomizing, setRandomizing] = useState(false);
 
   // Player handles (for autoplay A→B) and per-side "listened enough" state.
   const playerA = useRef<WaveformHandle>(null);
@@ -67,7 +73,6 @@ export function Arena() {
 
   async function generate() {
     if (!canGenerate || !requireAuth()) return;
-    setError(null);
     setWinner(null);
     setReveal(null);
     setBattle(null);
@@ -81,8 +86,11 @@ export function Arena() {
         body: JSON.stringify({ text: trimmed }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "generation failed");
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          detail?: string;
+        };
+        throw new Error(body.detail ?? body.error ?? "generation failed");
       }
       const data = (await res.json()) as GenerateResponse;
       setBattle({
@@ -92,8 +100,32 @@ export function Arena() {
       });
       setPhase("listen");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      toast.error(
+        "Couldn't generate audio",
+        e instanceof Error ? e.message : "Something went wrong. Try again.",
+      );
       setPhase("compose");
+    }
+  }
+
+  async function randomize() {
+    if (randomizing || phase !== "compose") return;
+    setRandomizing(true);
+    try {
+      const res = await fetch("/api/sentences/random");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "couldn't fetch a random line");
+      }
+      const data = (await res.json()) as RandomSentenceResponse;
+      setText(data.sentence);
+    } catch (e) {
+      toast.error(
+        "Couldn't fetch a random line",
+        e instanceof Error ? e.message : undefined,
+      );
+    } finally {
+      setRandomizing(false);
     }
   }
 
@@ -109,12 +141,18 @@ export function Arena() {
         body: JSON.stringify({ sessionId: battle.sessionId, chosen: side }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? "vote failed");
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          detail?: string;
+        };
+        throw new Error(body.detail ?? body.error ?? "vote failed");
       }
       setReveal((await res.json()) as VoteResponse);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Vote failed.");
+      toast.error(
+        "Couldn't record your vote",
+        e instanceof Error ? e.message : "Try again.",
+      );
       setWinner(null);
       setPhase(prev);
     }
@@ -125,7 +163,6 @@ export function Arena() {
     setBattle(null);
     setWinner(null);
     setReveal(null);
-    setError(null);
   }
 
   const busy = phase === "generating";
@@ -152,35 +189,43 @@ export function Arena() {
           placeholder="Type a line for both models to speak…"
           className="w-full resize-none bg-transparent px-5 pt-5 text-lg leading-relaxed outline-none disabled:opacity-55"
         />
-        <div className="flex items-center justify-end gap-3 px-4 pt-2 pb-4">
-          <span className={`tag ${overLimit ? "text-accent" : ""}`}>
-            {text.length}/{MAX_LEN}
-          </span>
+        <div className="flex items-center justify-between gap-3 px-4 pt-2 pb-4">
           {phase === "compose" ? (
             <button
-              onClick={generate}
-              disabled={!canGenerate}
-              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
+              onClick={randomize}
+              disabled={randomizing}
+              className="flex items-center gap-1.5 rounded-full bg-fill px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
+              title="Fill with a random line from the dataset"
             >
-              Synthesize →
+              {randomizing ? <Spinner /> : <span aria-hidden>🎲</span>} Random
             </button>
           ) : (
-            <button
-              onClick={reset}
-              disabled={busy}
-              className="rounded-full bg-fill px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
-            >
-              ↺ New round
-            </button>
+            <span />
           )}
+          <div className="flex items-center gap-3">
+            <span className={`tag ${overLimit ? "text-accent" : ""}`}>
+              {text.length}/{MAX_LEN}
+            </span>
+            {phase === "compose" ? (
+              <button
+                onClick={generate}
+                disabled={!canGenerate}
+                className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
+              >
+                Synthesize →
+              </button>
+            ) : (
+              <button
+                onClick={reset}
+                disabled={busy}
+                className="rounded-full bg-fill px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
+              >
+                ↺ New round
+              </button>
+            )}
+          </div>
         </div>
       </div>
-
-      {error && (
-        <p className="text-center text-sm text-accent" role="alert">
-          {error}
-        </p>
-      )}
 
       {/* Battle area */}
       <AnimatePresence>

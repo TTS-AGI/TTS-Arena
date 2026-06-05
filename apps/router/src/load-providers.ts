@@ -11,6 +11,14 @@ import { env } from "@ttsa/provider-sdk";
 // Public, in-repo providers — registered via import side effect.
 import "@ttsa/provider-elevenlabs";
 import "@ttsa/provider-minimax";
+import "@ttsa/provider-cartesia";
+import "@ttsa/provider-hume";
+import "@ttsa/provider-typecast";
+import "@ttsa/provider-gradium";
+import "@ttsa/provider-chatterbox";
+import "@ttsa/provider-inworld";
+import "@ttsa/provider-mars";
+import "@ttsa/provider-tontaube";
 
 let loaded = false;
 

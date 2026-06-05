@@ -35,15 +35,38 @@ jobs:
         with:
           lfs: true # pull the prompt corpus content, not just LFS pointers
 
+      - name: Install huggingface_hub (for reading existing Space secrets)
+        run: pip install --quiet "huggingface_hub>=0.25"
+
       - name: Sync deployment secrets to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-          MINIMAX_GROUP_ID: ${{ secrets.MINIMAX_GROUP_ID }}
           ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
           ADMIN_USERS: ${{ secrets.ADMIN_USERS }}
           PROVIDER_PLUGINS: ${{ secrets.PROVIDER_PLUGINS }}
+          # Public providers
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MINIMAX_GROUP_ID: ${{ secrets.MINIMAX_GROUP_ID }}
+          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
+          HUME_API_KEY: ${{ secrets.HUME_API_KEY }}
+          TYPECAST_API_KEY: ${{ secrets.TYPECAST_API_KEY }}
+          GRADIUM_API_KEY: ${{ secrets.GRADIUM_API_KEY }}
+          CHATTERBOX_API_KEY: ${{ secrets.CHATTERBOX_API_KEY }}
+          INWORLD_API_KEY: ${{ secrets.INWORLD_API_KEY }}
+          MARS_API_KEY: ${{ secrets.MARS_API_KEY }}
+          TONTAUBE_API_KEY: ${{ secrets.TONTAUBE_API_KEY }}
+          # Private providers
+          PARMESAN_BASE_URL: ${{ secrets.PARMESAN_BASE_URL }}
+          PARMESAN_API_KEY: ${{ secrets.PARMESAN_API_KEY }}
+          LANTERNFISH_API_URL: ${{ secrets.LANTERNFISH_API_URL }}
+          LANTERNFISH_API_KEY: ${{ secrets.LANTERNFISH_API_KEY }}
+          LANTERNFISH_MODEL: ${{ secrets.LANTERNFISH_MODEL }}
+          LANTERNFISH_REFERENCE_ID: ${{ secrets.LANTERNFISH_REFERENCE_ID }}
+          VOCU_API_KEY: ${{ secrets.VOCU_API_KEY }}
+          VOCU_BASE_URL: ${{ secrets.VOCU_BASE_URL }}
+          NLS_BASE_URL: ${{ secrets.NLS_BASE_URL }}
+          NLS_TOKEN: ${{ secrets.NLS_TOKEN }}
         run: |
           chmod +x deploy/space/set-secrets.sh
           deploy/space/set-secrets.sh "${HF_OWNER}/${HF_SPACE}"

@@ -1,35 +1,16 @@
 # Production-style stack built from the app Dockerfiles (no source mounts, no
-# hot reload). Postgres is expected to be external in real deploys; it's
-# included here for a self-contained run.
+# hot reload). The database is a single SQLite file on a named volume.
 #
 #   docker compose -f compose.prod.yaml up --build
 
 name: tts-arena-prod
 
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-arena}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena}
-      POSTGRES_DB: ${POSTGRES_DB:-tts_arena}
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arena}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   router:
     build:
       context: .
       dockerfile: apps/router/Dockerfile
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     env_file:
       - .env.development.local
     environment:
@@ -43,13 +24,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     env_file:
       - .env.development.local
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD:-arena}@db:5432/${POSTGRES_DB:-tts_arena}
+      SQLITE_PATH: /data/tts_arena.db
       ROUTER_URL: http://router:8080
       ROUTER_API_KEY: ${ROUTER_API_KEY:-}
       APP_URL: ${APP_URL:-http://localhost:3000}
@@ -58,6 +36,7 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
     volumes:
+      - db-data:/db
       - web-audio-cache:/audio-cache
 
 volumes:

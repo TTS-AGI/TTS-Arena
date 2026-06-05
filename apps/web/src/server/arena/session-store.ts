@@ -1,5 +1,5 @@
 /**
- * Battle session store — persisted in Postgres, with audio cached on disk.
+ * Battle session store — persisted in the database, with audio cached on disk.
  *
  * The point: model identity stays server-side until the user votes. The client
  * only ever gets an opaque `sessionId` and two audio URLs ("a"/"b"). Persisting
@@ -12,7 +12,7 @@
 import { eq, lte } from "drizzle-orm";
 import type { ModelType } from "@ttsa/shared";
 import { SESSION_TTL_SECONDS } from "@ttsa/shared";
-import { db } from "../db/client";
+import { db, withWriteRetry } from "../db/client";
 import { battleSessions } from "../db/schema";
 import { deleteAudio, writeAudio } from "./audio-cache";
 import { logAudio } from "./audio-log";
@@ -80,24 +80,29 @@ export async function createSession(input: {
     logSide("b", input.b),
   ]);
 
-  await db.insert(battleSessions).values({
-    id,
-    userId: input.userId,
-    modelType: input.modelType,
-    text: input.text,
-    sentenceHash: input.sentenceHash,
-    aModelId: input.a.modelId,
-    aVoice: input.a.voice,
-    aPath,
-    aExt: input.a.extension,
-    aLogPath,
-    bModelId: input.b.modelId,
-    bVoice: input.b.voice,
-    bPath,
-    bExt: input.b.extension,
-    bLogPath,
-    expiresAt: expires,
-  });
+  await withWriteRetry(() =>
+    db
+      .insert(battleSessions)
+      .values({
+        id,
+        userId: input.userId,
+        modelType: input.modelType,
+        text: input.text,
+        sentenceHash: input.sentenceHash,
+        aModelId: input.a.modelId,
+        aVoice: input.a.voice,
+        aPath,
+        aExt: input.a.extension,
+        aLogPath,
+        bModelId: input.b.modelId,
+        bVoice: input.b.voice,
+        bPath,
+        bExt: input.b.extension,
+        bLogPath,
+        expiresAt: expires,
+      })
+      .run(),
+  );
 
   return {
     id,
@@ -174,13 +179,6 @@ export async function getSideAudio(
     : { path: row.bPath, extension: row.bExt };
 }
 
-export async function markVoted(id: string): Promise<void> {
-  await db
-    .update(battleSessions)
-    .set({ voted: true })
-    .where(eq(battleSessions.id, id));
-}
-
 /** Delete a session row and its cached audio. */
 export async function deleteSession(id: string): Promise<void> {
   const row = await db.query.battleSessions.findFirst({
@@ -191,7 +189,9 @@ export async function deleteSession(id: string): Promise<void> {
 
 async function purge(id: string, paths: string[]): Promise<void> {
   await deleteAudio(paths);
-  await db.delete(battleSessions).where(eq(battleSessions.id, id));
+  await withWriteRetry(() =>
+    db.delete(battleSessions).where(eq(battleSessions.id, id)).run(),
+  );
 }
 
 /** Sweep expired sessions (DB rows + their disk audio). Returns count removed. */

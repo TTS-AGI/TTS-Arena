@@ -8,7 +8,7 @@ import type { ArenaModelDTO, ModelType } from "@ttsa/shared";
 import { db } from "../db/client";
 import { votes } from "../db/schema";
 import { synthesize } from "../router-client";
-import { getCatalog } from "./catalog";
+import { getCatalog, ensureModelsSeeded } from "./catalog";
 import { createSession, type BattleSession } from "./session-store";
 import { hashSentence } from "./sentences";
 
@@ -65,41 +65,101 @@ export async function generateBattle(params: {
     throw new Error("Not enough models are available right now");
   }
 
-  const [modelA, modelB] = weightedPickTwo(catalog, await appearanceCounts());
+  // Make sure the catalog models exist in the DB before a vote can FK to them.
+  // The router is the catalog's source of truth, but ratings live here, so the
+  // roster can drift from the last seed — sync it now.
+  await ensureModelsSeeded(catalog);
 
-  const [synthA, synthB] = await Promise.all([
-    synthesize({
-      text,
-      provider: modelA.provider,
-      model: modelA.routerModel,
-      includeRaw: true,
-    }),
-    synthesize({
-      text,
-      provider: modelB.provider,
-      model: modelB.routerModel,
-      includeRaw: true,
-    }),
-  ]);
+  const counts = await appearanceCounts();
 
-  return createSession({
-    userId,
-    modelType,
-    text,
-    sentenceHash: hashSentence(text),
-    a: {
-      modelId: modelA.id,
-      voice: synthA.voice,
-      audio: synthA.audio,
-      extension: synthA.extension,
-      rawAudio: synthA.raw,
-    },
-    b: {
-      modelId: modelB.id,
-      voice: synthB.voice,
-      audio: synthB.audio,
-      extension: synthB.extension,
-      rawAudio: synthB.raw,
-    },
-  });
+  // Synthesize a single model, tagging failures with which model failed so we
+  // can drop it and retry with another.
+  const synthOne = async (m: ArenaModelDTO) => {
+    try {
+      const out = await synthesize({
+        text,
+        provider: m.provider,
+        model: m.routerModel,
+        includeRaw: true,
+      });
+      return { model: m, synth: out };
+    } catch (err) {
+      throw new ModelSynthError(m, err);
+    }
+  };
+
+  // Pick two models and synthesize both. If a model fails, exclude it and retry
+  // with a fresh pick from the remaining pool, so one broken model/provider
+  // doesn't fail every battle it would have appeared in.
+  const broken = new Set<string>();
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const pool = catalog.filter((m) => !broken.has(m.id));
+    if (pool.length < 2) break;
+    const [modelA, modelB] = weightedPickTwo(pool, counts);
+    const results = await Promise.allSettled([
+      synthOne(modelA),
+      synthOne(modelB),
+    ]);
+
+    for (const r of results) {
+      if (r.status === "rejected" && r.reason instanceof ModelSynthError) {
+        broken.add(r.reason.model.id);
+        lastErr = r.reason.failure;
+        console.error("[generate] model synthesis failed, will retry", {
+          modelId: r.reason.model.id,
+          provider: r.reason.model.provider,
+          error:
+            r.reason.failure instanceof Error
+              ? r.reason.failure.message
+              : String(r.reason.failure),
+        });
+      }
+    }
+
+    if (
+      results[0].status === "fulfilled" &&
+      results[1].status === "fulfilled"
+    ) {
+      const a = results[0].value;
+      const b = results[1].value;
+      return createSession({
+        userId,
+        modelType,
+        text,
+        sentenceHash: hashSentence(text),
+        a: {
+          modelId: a.model.id,
+          voice: a.synth.voice,
+          audio: a.synth.audio,
+          extension: a.synth.extension,
+          rawAudio: a.synth.raw,
+        },
+        b: {
+          modelId: b.model.id,
+          voice: b.synth.voice,
+          audio: b.synth.audio,
+          extension: b.synth.extension,
+          rawAudio: b.synth.raw,
+        },
+      });
+    }
+  }
+
+  throw new Error(
+    `Could not synthesize a battle after retries${
+      lastErr instanceof Error ? `: ${lastErr.message}` : ""
+    }`,
+  );
+}
+
+/** Wraps a synthesis failure with the model that failed, for retry logic. */
+class ModelSynthError extends Error {
+  constructor(
+    readonly model: ArenaModelDTO,
+    readonly failure: unknown,
+  ) {
+    super(`synthesis failed for ${model.id}`);
+    this.name = "ModelSynthError";
+  }
 }

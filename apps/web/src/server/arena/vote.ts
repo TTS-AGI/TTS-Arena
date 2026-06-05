@@ -8,8 +8,9 @@
  */
 import { eq, sql } from "drizzle-orm";
 import { glickoUpdate, type Glicko } from "@ttsa/shared";
-import { db } from "../db/client";
+import { db, withWriteRetry } from "../db/client";
 import {
+  battleSessions,
   models,
   ratingHistory,
   voiceStats,
@@ -42,90 +43,111 @@ export async function recordVote(
   const origin = (await isDatasetPrompt(session.text)) ? "dataset" : "custom";
   const counts = true;
 
-  await db.transaction(async (tx) => {
-    // 1. Persist the vote.
-    const [vote] = await tx
-      .insert(votes)
-      .values({
-        userId: session.userId,
-        text: session.text,
-        modelType: session.modelType,
-        chosenModelId: chosenSide.modelId,
-        rejectedModelId: rejectedSide.modelId,
-        chosenVoice: chosenSide.voice,
-        rejectedVoice: rejectedSide.voice,
-        chosenAudioPath: chosenSide.logPath,
-        rejectedAudioPath: rejectedSide.logPath,
-        sentenceHash: session.sentenceHash,
-        sentenceOrigin: origin,
-        countsForPublic: counts,
-        sessionDurationSeconds: (Date.now() - session.createdAt) / 1000,
-      })
-      .returning({ id: votes.id });
-    const voteId = vote!.id;
+  // The SQLite driver (bun:sqlite / better-sqlite3) is synchronous, so the
+  // transaction callback must be synchronous too — no `await` inside, or the
+  // driver throws ("custom formatter threw an exception"). All reads/writes
+  // here run synchronously via the sync query builders.
+  //
+  // Wrapped in withWriteRetry because bun:sqlite doesn't wait on a held write
+  // lock; the whole vote (mark-voted + rating updates) is one transaction so a
+  // retry re-runs atomically.
+  await withWriteRetry(() =>
+    db.transaction((tx) => {
+      // 0. Mark the session voted (idempotency guard lives in the same tx).
+      tx.update(battleSessions)
+        .set({ voted: true })
+        .where(eq(battleSessions.id, session.id))
+        .run();
 
-    if (!counts) return;
+      // 1. Persist the vote.
+      const [vote] = tx
+        .insert(votes)
+        .values({
+          userId: session.userId,
+          text: session.text,
+          modelType: session.modelType,
+          chosenModelId: chosenSide.modelId,
+          rejectedModelId: rejectedSide.modelId,
+          chosenVoice: chosenSide.voice,
+          rejectedVoice: rejectedSide.voice,
+          chosenAudioPath: chosenSide.logPath,
+          rejectedAudioPath: rejectedSide.logPath,
+          sentenceHash: session.sentenceHash,
+          sentenceOrigin: origin,
+          countsForPublic: counts,
+          sessionDurationSeconds: (Date.now() - session.createdAt) / 1000,
+        })
+        .returning({ id: votes.id })
+        .all();
+      const voteId = vote!.id;
 
-    // 2. Live Glicko-2 update for both models.
-    const [chosenRow, rejectedRow] = await Promise.all([
-      tx.query.models.findFirst({ where: eq(models.id, chosenSide.modelId) }),
-      tx.query.models.findFirst({ where: eq(models.id, rejectedSide.modelId) }),
-    ]);
-    if (!chosenRow || !rejectedRow) return;
+      if (!counts) return;
 
-    const chosenBefore = glickoOf(chosenRow);
-    const rejectedBefore = glickoOf(rejectedRow);
-    const chosenAfter = glickoUpdate(chosenBefore, [
-      { opponent: rejectedBefore, score: 1 },
-    ]);
-    const rejectedAfter = glickoUpdate(rejectedBefore, [
-      { opponent: chosenBefore, score: 0 },
-    ]);
+      // 2. Live Glicko-2 update for both models.
+      const chosenRow = tx.query.models
+        .findFirst({ where: eq(models.id, chosenSide.modelId) })
+        .sync();
+      const rejectedRow = tx.query.models
+        .findFirst({ where: eq(models.id, rejectedSide.modelId) })
+        .sync();
+      if (!chosenRow || !rejectedRow) return;
 
-    await tx
-      .update(models)
-      .set({
-        rating: chosenAfter.rating,
-        ratingDeviation: chosenAfter.rd,
-        volatility: chosenAfter.vol,
-        winCount: chosenRow.winCount + 1,
-        matchCount: chosenRow.matchCount + 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(models.id, chosenRow.id));
-    await tx
-      .update(models)
-      .set({
-        rating: rejectedAfter.rating,
-        ratingDeviation: rejectedAfter.rd,
-        volatility: rejectedAfter.vol,
-        matchCount: rejectedRow.matchCount + 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(models.id, rejectedRow.id));
+      const chosenBefore = glickoOf(chosenRow);
+      const rejectedBefore = glickoOf(rejectedRow);
+      const chosenAfter = glickoUpdate(chosenBefore, [
+        { opponent: rejectedBefore, score: 1 },
+      ]);
+      const rejectedAfter = glickoUpdate(rejectedBefore, [
+        { opponent: chosenBefore, score: 0 },
+      ]);
 
-    // 3. Rating history trail.
-    await tx.insert(ratingHistory).values([
-      {
-        modelId: chosenRow.id,
-        modelType: session.modelType,
-        rating: chosenAfter.rating,
-        ratingDeviation: chosenAfter.rd,
-        voteId,
-      },
-      {
-        modelId: rejectedRow.id,
-        modelType: session.modelType,
-        rating: rejectedAfter.rating,
-        ratingDeviation: rejectedAfter.rd,
-        voteId,
-      },
-    ]);
+      tx.update(models)
+        .set({
+          rating: chosenAfter.rating,
+          ratingDeviation: chosenAfter.rd,
+          volatility: chosenAfter.vol,
+          winCount: chosenRow.winCount + 1,
+          matchCount: chosenRow.matchCount + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(models.id, chosenRow.id))
+        .run();
+      tx.update(models)
+        .set({
+          rating: rejectedAfter.rating,
+          ratingDeviation: rejectedAfter.rd,
+          volatility: rejectedAfter.vol,
+          matchCount: rejectedRow.matchCount + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(models.id, rejectedRow.id))
+        .run();
 
-    // 4. Per-voice stats (win for chosen voice, match for both).
-    await upsertVoiceStat(tx, chosenRow.id, chosenSide.voice, true);
-    await upsertVoiceStat(tx, rejectedRow.id, rejectedSide.voice, false);
-  });
+      // 3. Rating history trail.
+      tx.insert(ratingHistory)
+        .values([
+          {
+            modelId: chosenRow.id,
+            modelType: session.modelType,
+            rating: chosenAfter.rating,
+            ratingDeviation: chosenAfter.rd,
+            voteId,
+          },
+          {
+            modelId: rejectedRow.id,
+            modelType: session.modelType,
+            rating: rejectedAfter.rating,
+            ratingDeviation: rejectedAfter.rd,
+            voteId,
+          },
+        ])
+        .run();
+
+      // 4. Per-voice stats (win for chosen voice, match for both).
+      upsertVoiceStat(tx, chosenRow.id, chosenSide.voice, true);
+      upsertVoiceStat(tx, rejectedRow.id, rejectedSide.voice, false);
+    }),
+  );
 
   if (counts && origin === "dataset") {
     await markConsumed(session.text);
@@ -138,15 +160,14 @@ export async function recordVote(
   };
 }
 
-/** Increment a (model, voice) stat row, creating it if needed. */
-async function upsertVoiceStat(
+/** Increment a (model, voice) stat row, creating it if needed (synchronous). */
+function upsertVoiceStat(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   modelId: string,
   voice: string,
   won: boolean,
-): Promise<void> {
-  await tx
-    .insert(voiceStats)
+): void {
+  tx.insert(voiceStats)
     .values({
       modelId,
       voice,
@@ -160,5 +181,6 @@ async function upsertVoiceStat(
         matchCount: sql`${voiceStats.matchCount} + 1`,
         updatedAt: new Date(),
       },
-    });
+    })
+    .run();
 }

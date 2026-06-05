@@ -1,6 +1,6 @@
 /**
  * On-disk cache for battle audio. Generated clips are written here (not into
- * Postgres — blobs don't belong in the DB) and served by the audio route. The
+ * the DB — blobs don't belong in the database) and served by the audio route. The
  * DB session row stores the file paths; cleanup removes both together.
  *
  * Location: AUDIO_CACHE_DIR (default ./.audio-cache), created on demand.

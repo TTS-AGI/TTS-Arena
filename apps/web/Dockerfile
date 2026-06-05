@@ -6,6 +6,10 @@ WORKDIR /app
 
 # ── deps: install the whole workspace (cached on manifests) ──
 FROM base AS deps
+# Toolchain for native modules (better-sqlite3).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
 COPY package.json bun.lock ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/router/package.json apps/router/package.json

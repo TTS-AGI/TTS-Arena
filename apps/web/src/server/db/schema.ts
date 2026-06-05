@@ -1,67 +1,61 @@
 /**
- * Database schema (Drizzle, Postgres).
+ * Database schema (Drizzle, SQLite).
  *
  * Models the TTS arena cleanly: users, models with live Glicko-2 ratings,
- * votes, a rating-history trail, per-voice stats, and single-use sentences.
- * The old security/anti-abuse tables are intentionally omitted.
+ * votes, a rating-history trail, per-voice stats, single-use sentences, and
+ * battle sessions. The old security/anti-abuse tables are intentionally
+ * omitted.
  *
- * Glicko-2 lives on the model row (rating/deviation/volatility) for fast live
- * updates; the canonical leaderboard is a periodic Bradley–Terry fit computed
- * from `votes` (see server/rating).
+ * SQLite is used so the database is a single file the HF persistent bucket can
+ * store reliably (Postgres' data dir didn't survive the bucket sync).
+ * Booleans are stored as integers; timestamps as unix-epoch integers.
  */
 import { relations, sql } from "drizzle-orm";
 import {
-  boolean,
-  doublePrecision,
   index,
   integer,
-  pgTable,
-  serial,
+  real,
+  sqliteTable,
   text,
-  timestamp,
   uniqueIndex,
-  varchar,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
+
+const now = sql`(unixepoch())`;
 
 /* ── Users ────────────────────────────────────────────────────────────── */
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: varchar("username", { length: 100 }).notNull().unique(),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  username: text("username").notNull().unique(),
   /** Hugging Face account id (stable across username changes). */
-  hfId: varchar("hf_id", { length: 100 }).notNull().unique(),
-  joinDate: timestamp("join_date", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  hfId: text("hf_id").notNull().unique(),
+  joinDate: integer("join_date", { mode: "timestamp" }).notNull().default(now),
   /** HF account creation date, used for the sign-in age gate. */
-  hfAccountCreated: timestamp("hf_account_created", { withTimezone: true }),
+  hfAccountCreated: integer("hf_account_created", { mode: "timestamp" }),
   /** Email from the HF `email` OAuth scope (logged, not displayed). */
-  email: varchar("email", { length: 255 }),
+  email: text("email"),
   /** Absolute HF avatar URL. */
-  avatarUrl: varchar("avatar_url", { length: 500 }),
-  showInLeaderboard: boolean("show_in_leaderboard").notNull().default(true),
+  avatarUrl: text("avatar_url"),
+  showInLeaderboard: integer("show_in_leaderboard", { mode: "boolean" })
+    .notNull()
+    .default(true),
 });
 
 /* ── User logins (full history for abuse investigation) ───────────────── */
-/**
- * One row per login (and per vote refresh), recording the IP, user agent, and
- * browser fingerprint seen. Keeps the *entire* history — every IP/fingerprint a
- * user has ever connected from — not just the latest.
- */
-export const userLogins = pgTable(
+export const userLogins = sqliteTable(
   "user_logins",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
     /** Full client IP (resolved from forwarding headers). */
-    ip: varchar("ip", { length: 64 }),
-    userAgent: varchar("user_agent", { length: 500 }),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
     /** FingerprintJS visitor id supplied by the client. */
-    fingerprint: varchar("fingerprint", { length: 128 }),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    fingerprint: text("fingerprint"),
+    createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
-      .defaultNow(),
+      .default(now),
   },
   (t) => ({
     byUser: index("user_logins_user_idx").on(t.userId),
@@ -71,76 +65,78 @@ export const userLogins = pgTable(
 );
 
 /* ── Models ───────────────────────────────────────────────────────────── */
-export const models = pgTable("models", {
+export const models = sqliteTable("models", {
   /** Arena slug, e.g. "eleven-multilingual-v2". Matches @ttsa/shared MODELS. */
-  id: varchar("id", { length: 100 }).primaryKey(),
-  name: varchar("name", { length: 150 }).notNull(),
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
   /** "tts" | "conversational". */
-  modelType: varchar("model_type", { length: 20 }).notNull(),
-  isOpen: boolean("is_open").notNull().default(false),
-  isActive: boolean("is_active").notNull().default(true),
-  url: varchar("url", { length: 255 }),
+  modelType: text("model_type").notNull(),
+  isOpen: integer("is_open", { mode: "boolean" }).notNull().default(false),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  url: text("url"),
   /** Optional provider logo URL shown on the leaderboard. */
-  icon: varchar("icon", { length: 255 }),
+  icon: text("icon"),
 
   // ── Live Glicko-2 state ──
   /** Display rating (Glicko-2, centered on 1500). */
-  rating: doublePrecision("rating").notNull().default(1500),
+  rating: real("rating").notNull().default(1500),
   /** Rating deviation — uncertainty; high until enough games are played. */
-  ratingDeviation: doublePrecision("rating_deviation").notNull().default(350),
+  ratingDeviation: real("rating_deviation").notNull().default(350),
   /** Volatility — expected fluctuation in performance. */
-  volatility: doublePrecision("volatility").notNull().default(0.06),
+  volatility: real("volatility").notNull().default(0.06),
 
   // ── Denormalized counters (cheap reads; derived from votes) ──
   winCount: integer("win_count").notNull().default(0),
   matchCount: integer("match_count").notNull().default(0),
 
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+  updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
-    .defaultNow(),
+    .default(now),
 });
 
 /* ── Votes ────────────────────────────────────────────────────────────── */
-export const votes = pgTable(
+export const votes = sqliteTable(
   "votes",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
     text: text("text").notNull(),
-    modelType: varchar("model_type", { length: 20 }).notNull(),
+    modelType: text("model_type").notNull(),
 
-    chosenModelId: varchar("chosen_model_id", { length: 100 })
+    chosenModelId: text("chosen_model_id")
       .notNull()
       .references(() => models.id),
-    rejectedModelId: varchar("rejected_model_id", { length: 100 })
+    rejectedModelId: text("rejected_model_id")
       .notNull()
       .references(() => models.id),
 
     /** Provider-scoped voice ids actually used, for per-voice analytics. */
-    chosenVoice: varchar("chosen_voice", { length: 120 }),
-    rejectedVoice: varchar("rejected_voice", { length: 120 }),
+    chosenVoice: text("chosen_voice"),
+    rejectedVoice: text("rejected_voice"),
 
     /**
-     * Paths (in the /audio persistent bucket) to the PRE-normalization audio
-     * for each side, retained for a future RLHF/preference dataset release.
+     * Paths (in the /audio bucket) to the pre-normalization audio for each
+     * side, retained for a future preference dataset.
      */
     chosenAudioPath: text("chosen_audio_path"),
     rejectedAudioPath: text("rejected_audio_path"),
 
     /** SHA-256 of the trimmed prompt; ties votes to the sentence pool. */
-    sentenceHash: varchar("sentence_hash", { length: 64 }),
-    /** "dataset" | "custom". Only dataset prompts feed the public board. */
-    sentenceOrigin: varchar("sentence_origin", { length: 20 }).notNull(),
+    sentenceHash: text("sentence_hash"),
+    /** "dataset" | "custom". */
+    sentenceOrigin: text("sentence_origin").notNull(),
     /** Whether this vote affects public ratings. */
-    countsForPublic: boolean("counts_for_public").notNull().default(true),
+    countsForPublic: integer("counts_for_public", { mode: "boolean" })
+      .notNull()
+      .default(true),
 
     /** Seconds between generation and vote (engagement signal). */
-    sessionDurationSeconds: doublePrecision("session_duration_seconds"),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    sessionDurationSeconds: real("session_duration_seconds"),
+    createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
-      .defaultNow(),
+      .default(now),
   },
   (t) => ({
     byUser: index("votes_user_idx").on(t.userId),
@@ -152,20 +148,20 @@ export const votes = pgTable(
 );
 
 /* ── Rating history ───────────────────────────────────────────────────── */
-export const ratingHistory = pgTable(
+export const ratingHistory = sqliteTable(
   "rating_history",
   {
-    id: serial("id").primaryKey(),
-    modelId: varchar("model_id", { length: 100 })
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    modelId: text("model_id")
       .notNull()
       .references(() => models.id),
-    modelType: varchar("model_type", { length: 20 }).notNull(),
-    rating: doublePrecision("rating").notNull(),
-    ratingDeviation: doublePrecision("rating_deviation").notNull(),
+    modelType: text("model_type").notNull(),
+    rating: real("rating").notNull(),
+    ratingDeviation: real("rating_deviation").notNull(),
     voteId: integer("vote_id").references(() => votes.id),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
-      .defaultNow(),
+      .default(now),
   },
   (t) => ({
     byModel: index("rating_history_model_idx").on(t.modelId),
@@ -174,24 +170,19 @@ export const ratingHistory = pgTable(
 );
 
 /* ── Per-voice stats ──────────────────────────────────────────────────── */
-/**
- * Aggregated performance of each (model, voice) pair. The voice pool differs
- * per model, so this is keyed on both. Not displayed yet — collected so we can
- * surface which voices perform best per model later.
- */
-export const voiceStats = pgTable(
+export const voiceStats = sqliteTable(
   "voice_stats",
   {
-    id: serial("id").primaryKey(),
-    modelId: varchar("model_id", { length: 100 })
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    modelId: text("model_id")
       .notNull()
       .references(() => models.id),
-    voice: varchar("voice", { length: 120 }).notNull(),
+    voice: text("voice").notNull(),
     winCount: integer("win_count").notNull().default(0),
     matchCount: integer("match_count").notNull().default(0),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+    updatedAt: integer("updated_at", { mode: "timestamp" })
       .notNull()
-      .defaultNow(),
+      .default(now),
   },
   (t) => ({
     uniqModelVoice: uniqueIndex("voice_stats_model_voice_idx").on(
@@ -202,53 +193,45 @@ export const voiceStats = pgTable(
 );
 
 /* ── Consumed sentences (single-use dataset prompts) ──────────────────── */
-export const consumedSentences = pgTable("consumed_sentences", {
-  id: serial("id").primaryKey(),
-  sentenceHash: varchar("sentence_hash", { length: 64 }).notNull().unique(),
+export const consumedSentences = sqliteTable("consumed_sentences", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sentenceHash: text("sentence_hash").notNull().unique(),
   sentenceText: text("sentence_text").notNull(),
-  consumedAt: timestamp("consumed_at", { withTimezone: true })
+  consumedAt: integer("consumed_at", { mode: "timestamp" })
     .notNull()
-    .defaultNow(),
+    .default(now),
 });
 
 /* ── Battle sessions ──────────────────────────────────────────────────── */
-/**
- * A live blind battle, persisted so it survives server restarts and is shared
- * across requests/instances. Model identity lives here (server-side only) until
- * the user votes. Audio bytes are cached on disk (see arena/audio-cache); only
- * the file paths are stored here.
- */
-export const battleSessions = pgTable(
+export const battleSessions = sqliteTable(
   "battle_sessions",
   {
     /** Opaque session id (uuid) handed to the client. */
-    id: varchar("id", { length: 64 }).primaryKey(),
+    id: text("id").primaryKey(),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
-    modelType: varchar("model_type", { length: 20 }).notNull(),
+    modelType: text("model_type").notNull(),
     text: text("text").notNull(),
-    sentenceHash: varchar("sentence_hash", { length: 64 }).notNull(),
+    sentenceHash: text("sentence_hash").notNull(),
 
-    aModelId: varchar("a_model_id", { length: 100 }).notNull(),
-    aVoice: varchar("a_voice", { length: 120 }).notNull(),
+    aModelId: text("a_model_id").notNull(),
+    aVoice: text("a_voice").notNull(),
     aPath: text("a_path").notNull(),
-    aExt: varchar("a_ext", { length: 12 }).notNull(),
-    /** Path (in the /audio log bucket) to side A's pre-normalization clip. */
+    aExt: text("a_ext").notNull(),
     aLogPath: text("a_log_path"),
 
-    bModelId: varchar("b_model_id", { length: 100 }).notNull(),
-    bVoice: varchar("b_voice", { length: 120 }).notNull(),
+    bModelId: text("b_model_id").notNull(),
+    bVoice: text("b_voice").notNull(),
     bPath: text("b_path").notNull(),
-    bExt: varchar("b_ext", { length: 12 }).notNull(),
-    /** Path (in the /audio log bucket) to side B's pre-normalization clip. */
+    bExt: text("b_ext").notNull(),
     bLogPath: text("b_log_path"),
 
-    voted: boolean("voted").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    voted: integer("voted", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
-      .defaultNow(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+      .default(now),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
   },
   (t) => ({
     byExpiry: index("battle_sessions_expiry_idx").on(t.expiresAt),
@@ -285,5 +268,4 @@ export type ModelRow = typeof models.$inferSelect;
 export type VoteRow = typeof votes.$inferSelect;
 export type VoiceStatRow = typeof voiceStats.$inferSelect;
 
-// Re-exported so migration tooling and raw SQL helpers can reference it.
 export { sql };

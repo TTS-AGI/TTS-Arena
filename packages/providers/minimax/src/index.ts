@@ -24,13 +24,15 @@ import {
 const ENDPOINT = "https://api.minimaxi.chat/v1/t2a_v2";
 const DEFAULT_MODEL = "speech-2.6-hd";
 
+// Valid MiniMax model ids (verified against the API). The older tier is
+// `speech-02-*`, not `speech-2.5-*` (those ids don't exist and return no audio).
 const MODELS: ProviderModel[] = [
   { id: "speech-2.8-hd", name: "Hailuo Speech 2.8 HD" },
   { id: "speech-2.8-turbo", name: "Hailuo Speech 2.8 Turbo" },
   { id: "speech-2.6-hd", name: "Hailuo Speech 2.6 HD" },
   { id: "speech-2.6-turbo", name: "Hailuo Speech 2.6 Turbo" },
-  { id: "speech-2.5-hd", name: "Hailuo Speech 2.5 HD" },
-  { id: "speech-2.5-turbo", name: "Hailuo Speech 2.5 Turbo" },
+  { id: "speech-02-hd", name: "Hailuo Speech 02 HD" },
+  { id: "speech-02-turbo", name: "Hailuo Speech 02 Turbo" },
 ];
 
 // MiniMax exposes a large managed voice pool; this is a curated subset we
@@ -181,23 +183,23 @@ registerArenaModels([
     enabled: true,
   },
   {
-    id: "minimax-speech-2.5-hd",
-    name: "MiniMax Speech 2.5 HD",
+    id: "minimax-speech-02-hd",
+    name: "MiniMax Speech 02 HD",
     url: "https://minimax.io/",
     icon: ICON,
     open: false,
     provider: "minimax",
-    routerModel: "speech-2.5-hd",
+    routerModel: "speech-02-hd",
     enabled: true,
   },
   {
-    id: "minimax-speech-2.5-turbo",
-    name: "MiniMax Speech 2.5 Turbo",
+    id: "minimax-speech-02-turbo",
+    name: "MiniMax Speech 02 Turbo",
     url: "https://minimax.io/",
     icon: ICON,
     open: false,
     provider: "minimax",
-    routerModel: "speech-2.5-turbo",
+    routerModel: "speech-02-turbo",
     enabled: true,
   },
 ]);

@@ -60,6 +60,13 @@ export async function POST(req: Request) {
     };
     return NextResponse.json(body);
   } catch (err) {
+    // Log the full error server-side — this is the only place the real cause
+    // (router status, provider failure, timeout, …) is visible.
+    console.error("[tts/generate] failed", {
+      userId: user.id,
+      textLength: text.length,
+      error: err instanceof Error ? (err.stack ?? err.message) : String(err),
+    });
     return NextResponse.json(
       {
         error: "failed to generate audio",

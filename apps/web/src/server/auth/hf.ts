@@ -26,7 +26,8 @@ export function authorizeUrl(state: string): string {
     client_id: serverEnv.hfOAuth.clientId(),
     redirect_uri: redirectUri(),
     response_type: "code",
-    // `email` so we can log the user's address; `profile` for name/avatar.
+    // `openid profile` are always granted for Spaces (they must NOT be listed
+    // in hf_oauth_scopes); `email` is the one optional scope we declare there.
     scope: "openid profile email",
     state,
   });

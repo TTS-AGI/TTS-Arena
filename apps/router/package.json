@@ -12,9 +12,17 @@
     "lint": "echo 'no lint (covered by root prettier)'"
   },
   "dependencies": {
+    "@ttsa/provider-cartesia": "workspace:*",
+    "@ttsa/provider-chatterbox": "workspace:*",
     "@ttsa/provider-elevenlabs": "workspace:*",
+    "@ttsa/provider-gradium": "workspace:*",
+    "@ttsa/provider-hume": "workspace:*",
+    "@ttsa/provider-inworld": "workspace:*",
+    "@ttsa/provider-mars": "workspace:*",
     "@ttsa/provider-minimax": "workspace:*",
     "@ttsa/provider-sdk": "workspace:*",
+    "@ttsa/provider-tontaube": "workspace:*",
+    "@ttsa/provider-typecast": "workspace:*",
     "@ttsa/shared": "workspace:*",
     "hono": "^4.6.14"
   }

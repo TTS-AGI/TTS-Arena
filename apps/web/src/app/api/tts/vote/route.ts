@@ -9,11 +9,7 @@ import { NextResponse } from "next/server";
 import { inArray } from "drizzle-orm";
 import { voteRequestSchema, type VoteResponse } from "@ttsa/shared";
 import { currentUser } from "@/server/auth/user";
-import {
-  getSession,
-  markVoted,
-  deleteSession,
-} from "@/server/arena/session-store";
+import { getSession, deleteSession } from "@/server/arena/session-store";
 import { recordVote } from "@/server/arena/vote";
 import { db } from "@/server/db/client";
 import { models } from "@/server/db/schema";
@@ -46,30 +42,59 @@ export async function POST(req: Request) {
     );
   }
 
-  await markVoted(session.id);
-  const result = await recordVote(session, chosen);
-  await deleteSession(session.id); // audio no longer needed once revealed
+  try {
+    // recordVote marks the session voted + applies ratings in one transaction.
+    const result = await recordVote(session, chosen);
 
-  // Reveal display metadata from the DB (current name/url/open for each id).
-  const rows = await db
-    .select()
-    .from(models)
-    .where(inArray(models.id, [result.chosenModelId, result.rejectedModelId]));
-  const byId = new Map(rows.map((m) => [m.id, m]));
-  const reveal = (id: string) => {
-    const m = byId.get(id);
-    return {
-      id,
-      name: m?.name ?? id,
-      open: m?.isOpen ?? false,
-      url: m?.url ?? "",
+    // Reveal display metadata from the DB (current name/url/open for each id)
+    // BEFORE deleting the session, so a delete failure can't lose the result.
+    const rows = await db
+      .select()
+      .from(models)
+      .where(
+        inArray(models.id, [result.chosenModelId, result.rejectedModelId]),
+      );
+    const byId = new Map(rows.map((m) => [m.id, m]));
+    const reveal = (id: string) => {
+      const m = byId.get(id);
+      return {
+        id,
+        name: m?.name ?? id,
+        open: m?.isOpen ?? false,
+        url: m?.url ?? "",
+      };
     };
-  };
 
-  const body: VoteResponse = {
-    chosen: reveal(result.chosenModelId),
-    rejected: reveal(result.rejectedModelId),
-    counted: result.counted,
-  };
-  return NextResponse.json(body);
+    const body: VoteResponse = {
+      chosen: reveal(result.chosenModelId),
+      rejected: reveal(result.rejectedModelId),
+      counted: result.counted,
+    };
+
+    // Clean up the session + cached audio. Best-effort: the vote is already
+    // recorded, so a cleanup failure must NOT fail the request (the periodic
+    // sweep will reclaim it). This was silently 500ing votes.
+    deleteSession(session.id).catch((err) => {
+      console.error("[tts/vote] session cleanup failed (non-fatal)", {
+        sessionId: session.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    return NextResponse.json(body);
+  } catch (err) {
+    console.error("[tts/vote] failed", {
+      sessionId: session.id,
+      userId: user.id,
+      chosen,
+      error: err instanceof Error ? (err.stack ?? err.message) : String(err),
+    });
+    return NextResponse.json(
+      {
+        error: "failed to record vote",
+        detail: err instanceof Error ? err.message : undefined,
+      },
+      { status: 500 },
+    );
+  }
 }
