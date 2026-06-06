@@ -36,6 +36,8 @@
       "dependencies": {
         "@base-ui-components/react": "1.0.0-beta.1",
         "@fingerprintjs/fingerprintjs": "^5.2.0",
+        "@tanstack/react-query": "^5.101.0",
+        "@tanstack/react-table": "^8.21.3",
         "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs",
         "@ttsa/provider-minimax": "packages/providers/minimax",
         "@ttsa/provider-sdk": "packages/provider-sdk",
@@ -364,6 +366,14 @@
 
     "@tailwindcss/postcss": ["@tailwindcss/postcss@4.3.0", "", { "dependencies": { "@alloc/quick-lru": "^5.2.0", "@tailwindcss/node": "4.3.0", "@tailwindcss/oxide": "4.3.0", "postcss": "^8.5.10", "tailwindcss": "4.3.0" } }, "sha512-Jm05Tjx+9yCLGv5qw1c+84Psds8MnyrEQYCB+FFk2lgGiUjlRqdxke4mVTuYrj2xnVZqKim2Apr5ySuQRYAw/w=="],
 
+    "@tanstack/query-core": ["@tanstack/query-core@5.101.0", "", {}, "sha512-cQetA74EB+seWySv1TTKr828TnP0u39m6LykwDXIo84SNortpDkp30TMEjkqtYCNP9c40uT/iwl6MLiufEt0Ow=="],
+
+    "@tanstack/react-query": ["@tanstack/react-query@5.101.0", "", { "dependencies": { "@tanstack/query-core": "5.101.0" }, "peerDependencies": { "react": "^18 || ^19" } }, "sha512-rLlJXSpkqfizLWgkR5+eLeIk0MvTx/meEIR7LRjxic+qxiQP8zVjq7BqQkiCMNLQBlLfuOLqqr6KO5GtrDlmSg=="],
+
+    "@tanstack/react-table": ["@tanstack/react-table@8.21.3", "", { "dependencies": { "@tanstack/table-core": "8.21.3" }, "peerDependencies": { "react": ">=16.8", "react-dom": ">=16.8" } }, "sha512-5nNMTSETP4ykGegmVkhjcS8tTLW6Vl4axfEGQN3v0zdHYbK4UfoqfPChclTrJ4EoK9QynqAu9oUf8VEmrpZ5Ww=="],
+
+    "@tanstack/table-core": ["@tanstack/table-core@8.21.3", "", {}, "sha512-ldZXEhOBb8Is7xLs01fR3YEc3DERiz5silj8tnGkFZytt1abEvl/GhUmCE0PMLaMPTa3Jk4HbKmRlHmu+gCftg=="],
+
     "@ttsa/provider-cartesia": ["@ttsa/provider-cartesia@workspace:packages/providers/cartesia", { "dependencies": { "@ttsa/provider-sdk": "packages/provider-sdk" } }],
 
     "@ttsa/provider-chatterbox": ["@ttsa/provider-chatterbox@workspace:packages/providers/chatterbox", { "dependencies": { "@ttsa/provider-sdk": "packages/provider-sdk" } }],
@@ -390,7 +400,7 @@
 
     "@ttsa/shared": ["@ttsa/shared@workspace:packages/shared", { "dependencies": { "zod": "^3.24.1" } }],
 
-    "@ttsa/web": ["@ttsa/web@workspace:apps/web", { "dependencies": { "@base-ui-components/react": "1.0.0-beta.1", "@fingerprintjs/fingerprintjs": "^5.2.0", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/shared": "packages/shared", "better-sqlite3": "^12.10.0", "drizzle-orm": "^0.38.3", "jose": "^5.9.6", "motion": "^11.15.0", "next": "15.1.6", "react": "19.0.0", "react-dom": "19.0.0", "wavesurfer.js": "^7.12.7", "zod": "^3.24.1" }, "devDependencies": { "@tailwindcss/postcss": "^4.0.0", "@types/better-sqlite3": "^7.6.13", "@types/react": "^19.0.7", "@types/react-dom": "^19.0.3", "drizzle-kit": "^0.30.1", "eslint": "^9", "eslint-config-next": "15.1.6", "tailwindcss": "^4.0.0" } }],
+    "@ttsa/web": ["@ttsa/web@workspace:apps/web", { "dependencies": { "@base-ui-components/react": "1.0.0-beta.1", "@fingerprintjs/fingerprintjs": "^5.2.0", "@tanstack/react-query": "^5.101.0", "@tanstack/react-table": "^8.21.3", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/shared": "packages/shared", "better-sqlite3": "^12.10.0", "drizzle-orm": "^0.38.3", "jose": "^5.9.6", "motion": "^11.15.0", "next": "15.1.6", "react": "19.0.0", "react-dom": "19.0.0", "wavesurfer.js": "^7.12.7", "zod": "^3.24.1" }, "devDependencies": { "@tailwindcss/postcss": "^4.0.0", "@types/better-sqlite3": "^7.6.13", "@types/react": "^19.0.7", "@types/react-dom": "^19.0.3", "drizzle-kit": "^0.30.1", "eslint": "^9", "eslint-config-next": "15.1.6", "tailwindcss": "^4.0.0" } }],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg=="],
 

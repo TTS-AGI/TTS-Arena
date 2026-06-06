@@ -8,3 +8,4 @@ export * from "./glicko";
 export * from "./bradley-terry";
 export * from "./api";
 export * from "./router";
+export * from "./admin";

@@ -19,6 +19,8 @@
   "dependencies": {
     "@base-ui-components/react": "1.0.0-beta.1",
     "@fingerprintjs/fingerprintjs": "^5.2.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-table": "^8.21.3",
     "@ttsa/provider-elevenlabs": "workspace:*",
     "@ttsa/provider-minimax": "workspace:*",
     "@ttsa/provider-sdk": "workspace:*",

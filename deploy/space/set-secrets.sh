@@ -16,46 +16,52 @@ API="https://huggingface.co/api/spaces/${REPO}/secrets"
 # Set non-empty SYNC_SECRETS_FORCE to push every secret even if already present.
 FORCE="${SYNC_SECRETS_FORCE:-}"
 
-# Fetch the keys already set on the Space so we can skip them. The HF API only
-# returns key names (not values), which is enough to avoid re-pushing unchanged
-# secrets — re-pushing all of them on every deploy is what trips HF's 429 rate
-# limit. On any error we just treat the set as empty (push everything).
+# Fetch the keys already set on the Space so we can skip them — re-pushing all
+# of them on every deploy is what trips HF's 429 rate limit. The GET endpoint
+# returns a JSON object keyed by secret name (values are write-only and never
+# returned), which is all we need.
 #
-# Prefer huggingface_hub (the documented API: get_space_secrets returns a dict
-# keyed by secret name); fall back to the REST endpoint, parsing whichever shape
-# it returns (dict keyed by name, a list, or {secrets:[...]}).
-EXISTING="$(REPO="$REPO" HF_TOKEN="$HF_TOKEN" python3 - <<'PY' 2>/dev/null || true
-import os, sys
-repo, token = os.environ["REPO"], os.environ["HF_TOKEN"]
-keys = []
+# Use curl with a couple of retries (the read can itself be rate-limited right
+# after a burst of deploys). EXISTING_OK records whether the read succeeded so
+# that, if it didn't, we SKIP the whole sync rather than blindly re-push
+# everything and trip the limit.
+EXISTING=""
+EXISTING_OK=0
+for attempt in 1 2 3; do
+  resp="$(curl -sS "$API" -H "Authorization: Bearer ${HF_TOKEN}" \
+    -w '\n%{http_code}' 2>/dev/null || true)"
+  http="${resp##*$'\n'}"
+  body="${resp%$'\n'*}"
+  if [ "$http" = "200" ]; then
+    EXISTING="$(printf '%s' "$body" | python3 -c '
+import json, sys
 try:
-    from huggingface_hub import HfApi
-    keys = list(HfApi(token=token).get_space_secrets(repo_id=repo).keys())
-except Exception:
-    try:
-        import json, urllib.request
-        req = urllib.request.Request(
-            f"https://huggingface.co/api/spaces/{repo}/secrets",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        d = json.load(urllib.request.urlopen(req, timeout=15))
-        if isinstance(d, dict):
-            items = d.get("secrets", d.get("data"))
-            keys = (
-                list(d.keys())
-                if items is None
-                else [s.get("key", "") for s in items if isinstance(s, dict)]
-            )
-        elif isinstance(d, list):
-            keys = [s.get("key", "") for s in d if isinstance(s, dict)]
-    except Exception:
+    d = json.load(sys.stdin)
+    if isinstance(d, dict):
+        items = d.get("secrets", d.get("data"))
+        keys = list(d.keys()) if items is None else [s.get("key","") for s in items if isinstance(s, dict)]
+    elif isinstance(d, list):
+        keys = [s.get("key","") for s in d if isinstance(s, dict)]
+    else:
         keys = []
-print("\n".join(k for k in keys if k))
-PY
-)"
+    print("\n".join(k for k in keys if k))
+' 2>/dev/null || true)"
+    EXISTING_OK=1
+    break
+  fi
+  echo "[set-secrets] reading existing secrets failed ($http); retry $attempt" >&2
+  sleep $((attempt * 5))
+done
+
+if [ "$EXISTING_OK" = "1" ]; then
+  echo "[set-secrets] $(printf '%s\n' "$EXISTING" | grep -c .) secrets already on the Space"
+fi
 
 is_set() {
   [ -z "$FORCE" ] || return 1
+  # If we couldn't read the existing set, treat everything as already-set so we
+  # don't hammer the API (it's better to skip than to 429 the whole deploy).
+  [ "$EXISTING_OK" = "1" ] || return 0
   printf '%s\n' "$EXISTING" | grep -qx "$1"
 }
 

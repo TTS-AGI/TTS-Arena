@@ -16,8 +16,9 @@ import { HFLogo } from "./hf-logo";
 
 /**
  * Real Hugging Face auth, backed by /api/auth/*. `requireAuth` opens a sign-in
- * dialog whose primary action navigates to the OAuth flow; on return, `/me`
- * rehydrates the session. Generating and voting call `requireAuth` first.
+ * dialog whose primary action opens the OAuth flow in a new tab; on return to
+ * this tab, `/me` rehydrates the session. Generating and voting call
+ * `requireAuth` first.
  */
 
 type AuthCtx = {
@@ -35,13 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
+  const refreshSession = useCallback(async () => {
+    const res = await fetch("/api/auth/me");
+    const data = (await res.json()) as MeResponse;
+    setUser(data.user);
+    if (data.user) setOpen(false);
+  }, []);
+
   useEffect(() => {
     let active = true;
-    fetch("/api/auth/me")
-      .then((r) => r.json() as Promise<MeResponse>)
-      .then((d) => {
-        if (active) setUser(d.user);
-      })
+    refreshSession()
       .catch(() => {})
       .finally(() => {
         if (active) setLoading(false);
@@ -49,7 +53,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [refreshSession]);
+
+  useEffect(() => {
+    function refreshWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void refreshSession().catch(() => {});
+      }
+    }
+
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refreshSession]);
 
   // Once signed in, report the browser fingerprint (FingerprintJS) so logins
   // can be correlated for abuse investigation. Best-effort, once per session.
@@ -86,11 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setUser(null);
   }, []);
-
-  function startLogin() {
-    // Full-page redirect into the OAuth flow; we return to the app afterwards.
-    window.location.href = "/api/auth/login";
-  }
 
   return (
     <Ctx.Provider value={{ user, loading, requireAuth, signOut }}>
@@ -137,12 +151,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   counts once. Accounts must be at least 30 days old.
                 </Dialog.Description>
 
-                <button
-                  onClick={startLogin}
+                <a
+                  href="/api/auth/login"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#ff9d00] px-4 py-2.5 text-sm font-semibold text-[#3a2a00] transition-opacity hover:opacity-90"
                 >
                   <HFLogo className="h-4 w-4" /> Continue with Hugging Face
-                </button>
+                </a>
                 <button
                   onClick={() => setOpen(false)}
                   className="mt-2 w-full rounded-full px-4 py-2 text-sm text-ink-3 transition-colors hover:text-ink"

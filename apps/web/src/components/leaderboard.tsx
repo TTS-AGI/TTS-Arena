@@ -140,14 +140,6 @@ function Row({
         {displayRank}
       </span>
 
-      {model.tier ? (
-        <span className="relative grid h-6 w-6 place-items-center rounded-md bg-ink text-[0.65rem] font-bold text-canvas">
-          {model.tier}
-        </span>
-      ) : (
-        <span className="relative w-6" />
-      )}
-
       <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
         <ModelLogo icon={model.icon} />
         <a

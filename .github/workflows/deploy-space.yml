@@ -35,9 +35,6 @@ jobs:
         with:
           lfs: true # pull the prompt corpus content, not just LFS pointers
 
-      - name: Install huggingface_hub (for reading existing Space secrets)
-        run: pip install --quiet "huggingface_hub>=0.25"
-
       - name: Sync deployment secrets to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}

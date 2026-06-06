@@ -138,6 +138,21 @@
     border: 1px solid var(--color-line);
     border-radius: var(--radius);
   }
+
+  /* Text input — used in the admin forms */
+  .input {
+    width: 100%;
+    border: 1px solid var(--color-line-2);
+    border-radius: var(--radius-sm, 0.5rem);
+    background-color: transparent;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    outline: none;
+  }
+  .input:focus {
+    border-color: var(--color-accent);
+  }
 }
 
 @layer utilities {

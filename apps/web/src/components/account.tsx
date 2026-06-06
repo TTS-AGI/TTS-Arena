@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "./auth";
 import { SNAP } from "./motion";
@@ -61,6 +62,15 @@ export function Account() {
                   @{user.username}
                 </p>
               </div>
+              {user.isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMenu(false)}
+                  className="block w-full rounded-lg px-2.5 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-fill hover:text-ink"
+                >
+                  Admin panel
+                </Link>
+              )}
               <button
                 onClick={() => {
                   signOut();
