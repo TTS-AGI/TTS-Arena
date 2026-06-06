@@ -71,7 +71,17 @@ function main() {
         "INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)",
       ).run(tag, Date.now());
     });
-    tx();
+    try {
+      tx();
+    } catch (err) {
+      // Surface the real failure (and which migration) — a swallowed migrate is
+      // how the DB silently ends up missing columns.
+      console.error(
+        `[migrate] FAILED on ${tag}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+      throw err;
+    }
     count++;
     console.info(`applied migration ${tag}`);
   }

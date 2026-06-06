@@ -1,12 +1,14 @@
 /**
  * Recompute every model's live Glicko-2 rating from scratch by replaying all
- * counting votes in chronological order. Use after a bulk data change (e.g.
- * backfilling votes) so live ratings aren't stale. Also resets win/match
- * counters to match. Idempotent.
+ * *clean* counting votes in chronological order — votes with
+ * countsForPublic=true whose author isn't quarantined. Use after a bulk data
+ * change (backfill, retro-flagging by the security sweep, or a manual flag) so
+ * live ratings reflect only legitimate votes. Resets win/match counters too.
+ * Idempotent.
  *
  * Run with: bun run src/server/db/recompute-ratings.ts
  */
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import {
   DEFAULT_RATING,
   DEFAULT_RD,
@@ -15,9 +17,10 @@ import {
   type Glicko,
 } from "@ttsa/shared";
 import { db } from "./client";
-import { models, votes } from "./schema";
+import { models, users, votes } from "./schema";
 
-async function recompute() {
+/** Replay clean votes and rewrite live ratings + counters. Returns vote count. */
+export async function recomputeFromCleanVotes(): Promise<number> {
   const allModels = await db.select().from(models);
   const state = new Map<string, Glicko & { wins: number; matches: number }>(
     allModels.map((m) => [
@@ -32,10 +35,15 @@ async function recompute() {
     ]),
   );
 
+  // Clean = counts for public AND author not quarantined.
   const counting = await db
-    .select()
+    .select({
+      chosenModelId: votes.chosenModelId,
+      rejectedModelId: votes.rejectedModelId,
+    })
     .from(votes)
-    .where(eq(votes.countsForPublic, true))
+    .innerJoin(users, eq(votes.userId, users.id))
+    .where(and(eq(votes.countsForPublic, true), eq(users.quarantined, false)))
     .orderBy(asc(votes.createdAt), asc(votes.id));
 
   for (const v of counting) {
@@ -77,12 +85,18 @@ async function recompute() {
       .where(eq(models.id, id));
   }
 
-  console.info(`Recomputed ratings from ${counting.length} counting votes.`);
+  return counting.length;
 }
 
-recompute()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+// CLI entry: only run when executed directly (not when imported by the sweep).
+if (import.meta.main) {
+  recomputeFromCleanVotes()
+    .then((n) => {
+      console.info(`Recomputed ratings from ${n} clean votes.`);
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@base-ui-components/react": "1.0.0-beta.1",
+    "@cap.js/server": "^4.0.5",
+    "@cap.js/widget": "^0.1.55",
     "@fingerprintjs/fingerprintjs": "^5.2.0",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-table": "^8.21.3",
@@ -28,10 +30,12 @@
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.38.3",
     "jose": "^5.9.6",
+    "lucide-react": "^1.17.0",
     "motion": "^11.15.0",
     "next": "15.1.6",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "recharts": "^3.8.1",
     "wavesurfer.js": "^7.12.7",
     "zod": "^3.24.1"
   },

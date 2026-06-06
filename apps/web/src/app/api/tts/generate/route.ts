@@ -14,7 +14,7 @@ import {
 } from "@ttsa/shared";
 import { currentUser } from "@/server/auth/user";
 import { generateBattle } from "@/server/arena/generate";
-import { isConsumed, isEnglish } from "@/server/arena/sentences";
+import { isEnglish } from "@/server/arena/sentences";
 
 export async function POST(req: Request) {
   const user = await currentUser();
@@ -32,16 +32,11 @@ export async function POST(req: Request) {
     );
   }
   const text = parsed.data.text.trim();
+  const origin = parsed.data.fromPool ? "dataset" : "custom";
 
   if (!isEnglish(text)) {
     return NextResponse.json(
       { error: "English-only for now — multilingual is coming soon" },
-      { status: 400 },
-    );
-  }
-  if (await isConsumed(text)) {
-    return NextResponse.json(
-      { error: "that prompt has already been used — try another" },
       { status: 400 },
     );
   }
@@ -51,6 +46,7 @@ export async function POST(req: Request) {
       userId: user.id,
       modelType: "tts",
       text,
+      origin,
     });
     const body: GenerateResponse = {
       sessionId: session.id,

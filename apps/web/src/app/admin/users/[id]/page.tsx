@@ -2,10 +2,13 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AdminUserDetail } from "@ttsa/shared";
 import { PageHeader, StatCard } from "@/components/admin/shell";
 import { fmtDate, truncate } from "@/components/admin/data-table";
+import { AreaChartCard, HBarChartCard } from "@/components/admin/charts";
+import { useToast } from "@/components/toast";
 
 async function fetchUser(id: string): Promise<AdminUserDetail> {
   const res = await fetch(`/api/admin/users/${id}`);
@@ -19,9 +22,27 @@ export default function AdminUserDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const qc = useQueryClient();
+  const toast = useToast();
   const { data, isLoading, error } = useQuery({
     queryKey: ["admin", "user", id],
     queryFn: () => fetchUser(id),
+  });
+
+  const quarantineMutation = useMutation({
+    mutationFn: async (quarantined: boolean) => {
+      const res = await fetch(`/api/admin/users/${id}/quarantine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quarantined }),
+      });
+      if (!res.ok) throw new Error("failed");
+    },
+    onSuccess: (_d, quarantined) => {
+      qc.invalidateQueries({ queryKey: ["admin", "user", id] });
+      toast.success(quarantined ? "User quarantined" : "User released");
+    },
+    onError: () => toast.error("Couldn’t update user"),
   });
 
   if (error) {
@@ -41,12 +62,29 @@ export default function AdminUserDetailPage({
           data ? `User #${data.user.id} · ${data.user.hfId}` : undefined
         }
         actions={
-          <Link
-            href="/admin/users"
-            className="rounded-full bg-fill px-3 py-1.5 text-sm font-medium transition-colors hover:bg-line"
-          >
-            ← All users
-          </Link>
+          <div className="flex items-center gap-2">
+            {data && (
+              <button
+                onClick={() =>
+                  quarantineMutation.mutate(!data.user.quarantined)
+                }
+                disabled={quarantineMutation.isPending}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
+                  data.user.quarantined
+                    ? "bg-accent-soft text-accent hover:bg-accent hover:text-canvas"
+                    : "bg-fill hover:bg-line"
+                }`}
+              >
+                {data.user.quarantined ? "Release" : "Quarantine"}
+              </button>
+            )}
+            <Link
+              href="/admin/users"
+              className="flex items-center gap-1.5 rounded-full bg-fill px-3 py-1.5 text-sm font-medium transition-colors hover:bg-line"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden /> All users
+            </Link>
+          </div>
         }
       />
 
@@ -54,19 +92,38 @@ export default function AdminUserDetailPage({
         <p className="text-sm text-ink-3">Loading…</p>
       ) : (
         <div className="flex flex-col gap-5">
+          {data.user.quarantined && (
+            <div className="card border-l-4 border-l-accent px-4 py-3 text-sm">
+              <span className="font-semibold text-accent">Quarantined</span>
+              <span className="text-ink-2">
+                {" "}
+                — this user’s votes don’t count toward ratings.
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard label="Votes" value={data.user.voteCount} />
+            <StatCard label="Flagged" value={data.flaggedVotes} />
+            <StatCard label="Trust" value={Math.round(data.user.trustScore)} />
             <StatCard label="Logins" value={data.logins.length} />
-            <StatCard label="Joined" value={fmtDate(data.user.joinDate)} />
-            <StatCard
-              label="HF account"
-              value={
-                data.user.hfAccountCreated
-                  ? fmtDate(data.user.hfAccountCreated)
-                  : "—"
-              }
-            />
           </div>
+
+          {/* Activity + choice charts */}
+          <AreaChartCard
+            title="Activity per day (30d)"
+            data={data.votesByDay}
+            xKey="date"
+            series={[{ key: "count", label: "Votes" }]}
+          />
+          {data.choiceDistribution.length > 0 && (
+            <HBarChartCard
+              title="Models this user picks"
+              data={data.choiceDistribution}
+              labelKey="model"
+              valueKey="count"
+            />
+          )}
 
           {/* Logins: IP / UA / fingerprint history */}
           <div className="card overflow-hidden">

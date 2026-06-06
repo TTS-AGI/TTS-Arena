@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import type { ApiUser } from "@ttsa/shared";
 
 /**
@@ -14,6 +15,7 @@ const NAV = [
   { href: "/admin/models", label: "Models" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/votes", label: "Votes" },
+  { href: "/admin/security", label: "Security" },
   { href: "/admin/analytics", label: "Analytics" },
 ];
 
@@ -84,9 +86,9 @@ export function AdminShell({
             </div>
             <Link
               href="/"
-              className="rounded-lg px-3 py-2 text-sm text-ink-3 transition-colors hover:bg-fill/60 hover:text-ink"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-ink-3 transition-colors hover:bg-fill/60 hover:text-ink"
             >
-              ← Back to arena
+              <ArrowLeft className="h-4 w-4" aria-hidden /> Back to arena
             </Link>
           </div>
         </aside>

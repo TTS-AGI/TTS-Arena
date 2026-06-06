@@ -19,12 +19,14 @@ export async function GET(req: NextRequest) {
     userIdRaw && Number.isInteger(Number(userIdRaw))
       ? Number(userIdRaw)
       : undefined;
+  const flaggedOnly = sp.get("flagged") === "1";
 
   const body: AdminVotesResponse = await listVotes({
     page,
     pageSize,
     modelType,
     userId,
+    flaggedOnly,
   });
   return NextResponse.json(body);
 }

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { AdminAnalytics } from "@ttsa/shared";
 import { PageHeader, StatCard } from "@/components/admin/shell";
+import { BarChartCard, HBarChartCard } from "@/components/admin/charts";
 
 async function fetchAnalytics(): Promise<AdminAnalytics> {
   const res = await fetch("/api/admin/analytics");
@@ -46,47 +47,30 @@ export default function AdminAnalyticsPage() {
             />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            {/* Votes by origin */}
-            <div className="card p-4">
-              <p className="tag mb-3">Votes by prompt origin</p>
-              <ul className="flex flex-col gap-2">
-                {data.votesByOrigin.length === 0 && (
-                  <li className="text-sm text-ink-3">No votes yet.</li>
-                )}
-                {data.votesByOrigin.map((o) => (
-                  <li
-                    key={o.origin}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="capitalize">{o.origin}</span>
-                    <span className="nums font-medium">
-                      {o.count.toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {data.topModelsByVotes.length > 0 && (
+            <HBarChartCard
+              title="Most-voted models"
+              data={data.topModelsByVotes.map((m) => ({
+                name: m.name,
+                votes: m.votes,
+              }))}
+              labelKey="name"
+              valueKey="votes"
+            />
+          )}
 
-            {/* Top models by votes */}
-            <div className="card p-4">
-              <p className="tag mb-3">Most-voted models</p>
-              <ul className="flex flex-col gap-1.5">
-                {data.topModelsByVotes.length === 0 && (
-                  <li className="text-sm text-ink-3">No data.</li>
-                )}
-                {data.topModelsByVotes.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="truncate">{m.name}</span>
-                    <span className="nums ml-2 font-medium">{m.votes}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          {data.votesByOrigin.length > 0 && (
+            <BarChartCard
+              title="Votes by prompt origin"
+              data={data.votesByOrigin.map((o) => ({
+                origin: o.origin,
+                count: o.count,
+              }))}
+              xKey="origin"
+              series={[{ key: "count", label: "Votes" }]}
+              height={180}
+            />
+          )}
 
           {/* Top voices */}
           <div className="card overflow-hidden">

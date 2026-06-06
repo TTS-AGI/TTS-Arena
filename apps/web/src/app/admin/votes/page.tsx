@@ -1,35 +1,69 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type { AdminVoteRow, AdminVotesResponse } from "@ttsa/shared";
 import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 import { PageHeader } from "@/components/admin/shell";
 import { DataTable, fmtDate, truncate } from "@/components/admin/data-table";
+import { useToast } from "@/components/toast";
 
 async function fetchVotes(
   page: number,
   pageSize: number,
+  flaggedOnly: boolean,
 ): Promise<AdminVotesResponse> {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
   });
+  if (flaggedOnly) params.set("flagged", "1");
   const res = await fetch(`/api/admin/votes?${params}`);
   if (!res.ok) throw new Error("failed");
   return res.json();
 }
 
 export default function AdminVotesPage() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 50,
   });
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin", "votes", pagination.pageIndex, pagination.pageSize],
-    queryFn: () => fetchVotes(pagination.pageIndex, pagination.pageSize),
+    queryKey: [
+      "admin",
+      "votes",
+      pagination.pageIndex,
+      pagination.pageSize,
+      flaggedOnly,
+    ],
+    queryFn: () =>
+      fetchVotes(pagination.pageIndex, pagination.pageSize, flaggedOnly),
     placeholderData: keepPreviousData,
+  });
+
+  const flagMutation = useMutation({
+    mutationFn: async (v: { id: number; flagged: boolean }) => {
+      const res = await fetch(`/api/admin/votes/${v.id}/flag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged: v.flagged }),
+      });
+      if (!res.ok) throw new Error("failed");
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["admin", "votes"] });
+      toast.success(v.flagged ? "Vote flagged" : "Vote reinstated");
+    },
+    onError: () => toast.error("Couldn’t update vote"),
   });
 
   const pageCount = data
@@ -72,34 +106,39 @@ export default function AdminVotesPage() {
         ),
       },
       {
-        id: "voices",
-        header: "Voices",
+        accessorKey: "riskScore",
+        header: "Risk",
         enableSorting: false,
-        cell: (c) => (
-          <span className="font-mono text-xs text-ink-3">
-            {c.row.original.chosenVoice ?? "—"} /{" "}
-            {c.row.original.rejectedVoice ?? "—"}
-          </span>
-        ),
+        cell: (c) => {
+          const s = c.row.original.riskScore;
+          if (!s) return <span className="text-ink-4">0</span>;
+          return (
+            <span
+              className={`nums font-medium ${s >= 50 ? "text-accent" : "text-amber-500"}`}
+            >
+              {Math.round(s)}
+            </span>
+          );
+        },
       },
       {
-        accessorKey: "sentenceOrigin",
-        header: "Origin",
+        id: "status",
+        header: "Status",
         enableSorting: false,
-        cell: (c) => (
-          <span className="tag">{c.row.original.sentenceOrigin}</span>
-        ),
-      },
-      {
-        accessorKey: "countsForPublic",
-        header: "Counts",
-        enableSorting: false,
-        cell: (c) =>
-          c.row.original.countsForPublic ? (
-            <span className="text-accent">✓</span>
+        cell: (c) => {
+          const r = c.row.original;
+          if (r.flagged)
+            return (
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
+                flagged
+              </span>
+            );
+          return r.countsForPublic ? (
+            <span className="text-accent">✓ counts</span>
           ) : (
-            <span className="text-ink-4">—</span>
-          ),
+            <span className="text-ink-4">— excluded</span>
+          );
+        },
       },
       {
         accessorKey: "text",
@@ -107,12 +146,31 @@ export default function AdminVotesPage() {
         enableSorting: false,
         cell: (c) => (
           <span className="text-ink-3">
-            {truncate(c.row.original.text, 50)}
+            {truncate(c.row.original.text, 44)}
           </span>
         ),
       },
+      {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: (c) => {
+          const r = c.row.original;
+          return (
+            <button
+              onClick={() =>
+                flagMutation.mutate({ id: r.id, flagged: !r.flagged })
+              }
+              disabled={flagMutation.isPending}
+              className="rounded-md bg-fill px-2.5 py-1 text-xs font-medium transition-colors hover:bg-line disabled:opacity-50"
+            >
+              {r.flagged ? "Reinstate" : "Flag"}
+            </button>
+          );
+        },
+      },
     ],
-    [],
+    [flagMutation],
   );
 
   return (
@@ -120,6 +178,19 @@ export default function AdminVotesPage() {
       <PageHeader
         title="Votes"
         subtitle={data ? `${data.total.toLocaleString()} votes` : undefined}
+        actions={
+          <label className="flex items-center gap-2 text-sm text-ink-2">
+            <input
+              type="checkbox"
+              checked={flaggedOnly}
+              onChange={(e) => {
+                setFlaggedOnly(e.target.checked);
+                setPagination((p) => ({ ...p, pageIndex: 0 }));
+              }}
+            />
+            Flagged only
+          </label>
+        }
       />
       <DataTable
         columns={columns}
@@ -129,7 +200,7 @@ export default function AdminVotesPage() {
         pagination={pagination}
         onPaginationChange={setPagination}
         loading={isLoading || isFetching}
-        emptyMessage="No votes yet."
+        emptyMessage="No votes."
         pageSizeOptions={[50, 100]}
       />
     </div>

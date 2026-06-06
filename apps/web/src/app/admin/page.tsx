@@ -5,6 +5,7 @@ import type { AdminOverview } from "@ttsa/shared";
 import Link from "next/link";
 import { PageHeader, StatCard } from "@/components/admin/shell";
 import { fmtDate } from "@/components/admin/data-table";
+import { BarChartCard } from "@/components/admin/charts";
 
 async function fetchOverview(): Promise<AdminOverview> {
   const res = await fetch("/api/admin/overview");
@@ -60,31 +61,20 @@ export default function AdminOverviewPage() {
 }
 
 function VotesChart({ data }: { data: AdminOverview["votesByDay"] }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
   const total = data.reduce((s, d) => s + d.count, 0);
   return (
-    <div className="card p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <p className="tag">Votes · last 30 days</p>
-        <p className="nums text-sm font-medium text-ink-2">
+    <BarChartCard
+      title="Votes · last 30 days"
+      right={
+        <span className="nums text-sm font-medium text-ink-2">
           {total.toLocaleString()} total
-        </p>
-      </div>
-      <div className="flex h-28 items-end gap-[3px]">
-        {data.map((d) => (
-          <div
-            key={d.date}
-            title={`${d.date}: ${d.count}`}
-            className="flex-1 rounded-t-sm bg-accent-soft transition-colors hover:bg-accent"
-            style={{ height: `${Math.max(2, (d.count / max) * 100)}%` }}
-          />
-        ))}
-      </div>
-      <div className="mt-1.5 flex justify-between">
-        <span className="tag">{data[0]?.date}</span>
-        <span className="tag">{data[data.length - 1]?.date}</span>
-      </div>
-    </div>
+        </span>
+      }
+      data={data as unknown as Record<string, unknown>[]}
+      xKey="date"
+      series={[{ key: "count", label: "Votes" }]}
+      height={160}
+    />
   );
 }
 

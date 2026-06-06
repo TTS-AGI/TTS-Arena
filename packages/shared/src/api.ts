@@ -28,6 +28,9 @@ export type MeResponse = z.infer<typeof meResponseSchema>;
 
 export const ttsGenerateRequestSchema = z.object({
   text: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
+  /** True when the text came from the prompt pool (the Random button), not
+   *  free-typed. Determines the vote's recorded sentenceOrigin. */
+  fromPool: z.boolean().optional(),
 });
 export type TTSGenerateRequest = z.infer<typeof ttsGenerateRequestSchema>;
 
@@ -74,6 +77,16 @@ export const voteResponseSchema = z.object({
   counted: z.boolean(),
 });
 export type VoteResponse = z.infer<typeof voteResponseSchema>;
+
+/**
+ * When a captcha is required before the vote can be recorded, the vote endpoint
+ * returns this instead (HTTP 200) — the client solves the Cap challenge and
+ * retries with the token. Kept separate so the normal path stays unchanged.
+ */
+export const captchaRequiredSchema = z.object({
+  needsCaptcha: z.literal(true),
+});
+export type CaptchaRequired = z.infer<typeof captchaRequiredSchema>;
 
 /* ── Leaderboard ──────────────────────────────────────────────────────── */
 

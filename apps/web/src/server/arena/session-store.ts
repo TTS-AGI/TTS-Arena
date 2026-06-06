@@ -40,6 +40,8 @@ export type BattleSession = {
   modelType: ModelType;
   text: string;
   sentenceHash: string;
+  /** "dataset" (unchanged pool prompt) | "custom". */
+  origin: "dataset" | "custom";
   a: SessionSide;
   b: SessionSide;
   createdAt: number;
@@ -53,6 +55,7 @@ export async function createSession(input: {
   modelType: ModelType;
   text: string;
   sentenceHash: string;
+  origin: "dataset" | "custom";
   a: BattleSide;
   b: BattleSide;
 }): Promise<BattleSession> {
@@ -89,6 +92,7 @@ export async function createSession(input: {
         modelType: input.modelType,
         text: input.text,
         sentenceHash: input.sentenceHash,
+        sentenceOrigin: input.origin,
         aModelId: input.a.modelId,
         aVoice: input.a.voice,
         aPath,
@@ -110,6 +114,7 @@ export async function createSession(input: {
     modelType: input.modelType,
     text: input.text,
     sentenceHash: input.sentenceHash,
+    origin: input.origin,
     a: {
       modelId: input.a.modelId,
       voice: input.a.voice,
@@ -147,6 +152,7 @@ export async function getSession(id: string): Promise<BattleSession | null> {
     modelType: row.modelType as ModelType,
     text: row.text,
     sentenceHash: row.sentenceHash,
+    origin: (row.sentenceOrigin as "dataset" | "custom") ?? "custom",
     a: {
       modelId: row.aModelId,
       voice: row.aVoice,

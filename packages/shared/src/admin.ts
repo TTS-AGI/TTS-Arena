@@ -4,6 +4,15 @@
  */
 import { z } from "zod";
 
+/* ── Shared time series ───────────────────────────────────────────────── */
+
+export const timePointSchema = z.object({
+  date: z.string(),
+  count: z.number().int(),
+  flagged: z.number().int().optional(),
+});
+export type TimePoint = z.infer<typeof timePointSchema>;
+
 /* ── Overview ─────────────────────────────────────────────────────────── */
 
 export const adminOverviewSchema = z.object({
@@ -90,7 +99,19 @@ export const adminUsersResponseSchema = z.object({
 export type AdminUsersResponse = z.infer<typeof adminUsersResponseSchema>;
 
 export const adminUserDetailSchema = z.object({
-  user: adminUserRowSchema.extend({ hfId: z.string() }),
+  user: adminUserRowSchema.extend({
+    hfId: z.string(),
+    trustScore: z.number(),
+    quarantined: z.boolean(),
+  }),
+  /** Flagged-vote count for this user (fraud lens). */
+  flaggedVotes: z.number().int(),
+  /** Votes per day (clean vs flagged), last 30d. */
+  votesByDay: z.array(timePointSchema),
+  /** Distribution of which model the user picks (bias lens). */
+  choiceDistribution: z.array(
+    z.object({ model: z.string(), count: z.number().int() }),
+  ),
   logins: z.array(
     z.object({
       id: z.number().int(),
@@ -106,6 +127,8 @@ export const adminUserDetailSchema = z.object({
       createdAt: z.number().int(),
       chosenModel: z.string(),
       rejectedModel: z.string(),
+      flagged: z.boolean(),
+      riskScore: z.number(),
       text: z.string(),
     }),
   ),
@@ -125,6 +148,8 @@ export const adminVoteRowSchema = z.object({
   rejectedVoice: z.string().nullable(),
   sentenceOrigin: z.string(),
   countsForPublic: z.boolean(),
+  flagged: z.boolean(),
+  riskScore: z.number(),
   text: z.string(),
 });
 export type AdminVoteRow = z.infer<typeof adminVoteRowSchema>;
@@ -160,3 +185,90 @@ export const adminAnalyticsSchema = z.object({
   ),
 });
 export type AdminAnalytics = z.infer<typeof adminAnalyticsSchema>;
+
+/* ── Model detail (drill-down) ────────────────────────────────────────── */
+
+export const adminModelDetailSchema = z.object({
+  model: adminModelSchema,
+  rank: z.number().int(),
+  flaggedVotes: z.number().int(),
+  /** Rating + RD over time, one point per recorded match. */
+  ratingHistory: z.array(
+    z.object({
+      t: z.number().int(),
+      rating: z.number(),
+      rd: z.number(),
+    }),
+  ),
+  /** Votes per day where this model appeared (clean vs flagged). */
+  votesByDay: z.array(timePointSchema),
+  /** Win/loss vs each opponent (top by total). */
+  vsOpponents: z.array(
+    z.object({
+      opponent: z.string(),
+      wins: z.number().int(),
+      losses: z.number().int(),
+      winRate: z.number(),
+    }),
+  ),
+  /** Top voters for this model + their flagged share (fraud lens). */
+  topVoters: z.array(
+    z.object({
+      userId: z.number().int(),
+      username: z.string(),
+      votes: z.number().int(),
+      flagged: z.number().int(),
+    }),
+  ),
+  recentVotes: z.array(adminVoteRowSchema),
+});
+export type AdminModelDetail = z.infer<typeof adminModelDetailSchema>;
+
+/* ── Security ─────────────────────────────────────────────────────────── */
+
+export const adminSecurityEventSchema = z.object({
+  id: z.number().int(),
+  createdAt: z.number().int(),
+  kind: z.string(),
+  severity: z.string(),
+  userId: z.number().int().nullable(),
+  username: z.string().nullable(),
+  ip: z.string().nullable(),
+  fingerprint: z.string().nullable(),
+  voteId: z.number().int().nullable(),
+  detail: z.string().nullable(),
+});
+export type AdminSecurityEvent = z.infer<typeof adminSecurityEventSchema>;
+
+export const adminSecurityOverviewSchema = z.object({
+  flaggedVotes: z.number().int(),
+  totalVotes: z.number().int(),
+  quarantinedUsers: z.number().int(),
+  eventsBySeverity: z.array(
+    z.object({ severity: z.string(), count: z.number().int() }),
+  ),
+  topRiskyIps: z.array(
+    z.object({
+      ip: z.string(),
+      accounts: z.number().int(),
+      events: z.number().int(),
+    }),
+  ),
+  recentEvents: z.array(adminSecurityEventSchema),
+  quarantined: z.array(
+    z.object({
+      id: z.number().int(),
+      username: z.string(),
+      trustScore: z.number(),
+    }),
+  ),
+});
+export type AdminSecurityOverview = z.infer<typeof adminSecurityOverviewSchema>;
+
+export const adminSecurityEventsResponseSchema = z.object({
+  rows: z.array(adminSecurityEventSchema),
+  total: z.number().int(),
+});
+export type AdminSecurityEventsResponse = z.infer<
+  typeof adminSecurityEventsResponseSchema
+>;

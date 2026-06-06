@@ -4,8 +4,11 @@
  * safety net for sessions that are generated but never voted on.
  */
 import { sweepExpired } from "./session-store";
+import { runSecuritySweep } from "../security/sweep";
 
 const INTERVAL_MS = 5 * 60 * 1000;
+/** Security sweep runs less often (cross-entity analysis is heavier). */
+const SECURITY_INTERVAL_MS = 10 * 60 * 1000;
 
 let started = false;
 
@@ -25,8 +28,19 @@ export function startCleanup(): void {
     }
   };
 
+  const securityTick = async () => {
+    try {
+      await runSecuritySweep();
+    } catch (err) {
+      console.error("[cleanup] security sweep failed:", err);
+    }
+  };
+
   // Kick once shortly after boot, then on an interval.
   setTimeout(tick, 30_000);
+  setTimeout(securityTick, 90_000);
   const timer = setInterval(tick, INTERVAL_MS);
+  const secTimer = setInterval(securityTick, SECURITY_INTERVAL_MS);
   if (typeof timer === "object" && "unref" in timer) timer.unref();
+  if (typeof secTimer === "object" && "unref" in secTimer) secTimer.unref();
 }

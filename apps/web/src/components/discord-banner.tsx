@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { ArrowRight, X } from "lucide-react";
 
 const DISCORD_URL = "https://discord.gg/HB8fMR6GTr";
 const DISMISS_KEY = "ttsa-discord-dismissed";
@@ -41,10 +42,11 @@ export function DiscordBanner() {
             className="flex items-center justify-center gap-2 px-10 py-2 text-center text-sm font-medium transition-opacity hover:opacity-90"
           >
             <DiscordMark />
-            <span>
+            <span className="inline-flex items-center">
               Join the community on Discord
-              <span className="ml-1.5 opacity-80 max-sm:hidden">
-                — help shape the arena →
+              <span className="ml-1.5 inline-flex items-center gap-1 opacity-80 max-sm:hidden">
+                — help shape the arena
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               </span>
             </span>
           </a>
@@ -53,16 +55,7 @@ export function DiscordBanner() {
             aria-label="Dismiss"
             className="absolute top-1/2 right-2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-white/80 transition-colors hover:bg-white/15 hover:text-white"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              className="h-3.5 w-3.5"
-            >
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
+            <X className="h-3.5 w-3.5" aria-hidden />
           </button>
         </motion.div>
       )}

@@ -57,8 +57,10 @@ export async function generateBattle(params: {
   userId: number;
   modelType: ModelType;
   text: string;
+  /** "dataset" if the prompt came unchanged from the pool, else "custom". */
+  origin: "dataset" | "custom";
 }): Promise<BattleSession> {
-  const { userId, modelType, text } = params;
+  const { userId, modelType, text, origin } = params;
 
   const catalog = await getCatalog();
   if (catalog.length < 2) {
@@ -127,6 +129,7 @@ export async function generateBattle(params: {
         userId,
         modelType,
         text,
+        origin,
         sentenceHash: hashSentence(text),
         a: {
           modelId: a.model.id,

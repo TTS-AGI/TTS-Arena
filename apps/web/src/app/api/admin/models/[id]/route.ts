@@ -1,8 +1,28 @@
-/** PATCH /api/admin/models/[id] — edit a model's display/active fields. Admin only. */
+/**
+ * GET  /api/admin/models/[id] — drill-down detail (charts + recent votes).
+ * PATCH /api/admin/models/[id] — edit a model's display/active fields.
+ * Admin only.
+ */
 import { NextResponse, type NextRequest } from "next/server";
 import { adminModelUpdateSchema } from "@ttsa/shared";
 import { requireAdmin } from "@/server/auth/admin";
-import { updateModel } from "@/server/admin/queries";
+import { modelDetail, updateModel } from "@/server/admin/queries";
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    return NextResponse.json({ error: "forbidden" }, { status: guard.status });
+  }
+  const { id } = await params;
+  const detail = await modelDetail(id);
+  if (!detail) {
+    return NextResponse.json({ error: "model not found" }, { status: 404 });
+  }
+  return NextResponse.json(detail);
+}
 
 export async function PATCH(
   req: NextRequest,

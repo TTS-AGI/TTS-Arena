@@ -9,18 +9,30 @@
 import { and, eq } from "drizzle-orm";
 import { bradleyTerry, type BTRating, type ModelType } from "@ttsa/shared";
 import { db } from "../db/client";
-import { models, votes } from "../db/schema";
+import { models, users, votes } from "../db/schema";
 
 const RECOMPUTE_DELTA = 50;
 
 type Entry = { voteCount: number; ratings: Map<string, BTRating> };
 const cache = new Map<ModelType, Entry>();
 
+/** Drop the cache so the next leaderboard read refits (after retro-flagging). */
+export function invalidateBTCache(): void {
+  cache.clear();
+}
+
 async function countingVotes(type: ModelType): Promise<number> {
   const rows = await db
     .select({ c: votes.id })
     .from(votes)
-    .where(and(eq(votes.modelType, type), eq(votes.countsForPublic, true)));
+    .innerJoin(users, eq(votes.userId, users.id))
+    .where(
+      and(
+        eq(votes.modelType, type),
+        eq(votes.countsForPublic, true),
+        eq(users.quarantined, false),
+      ),
+    );
   return rows.length;
 }
 
@@ -40,7 +52,14 @@ export async function getBTRatings(
   const outcomes = await db
     .select({ winner: votes.chosenModelId, loser: votes.rejectedModelId })
     .from(votes)
-    .where(and(eq(votes.modelType, type), eq(votes.countsForPublic, true)));
+    .innerJoin(users, eq(votes.userId, users.id))
+    .where(
+      and(
+        eq(votes.modelType, type),
+        eq(votes.countsForPublic, true),
+        eq(users.quarantined, false),
+      ),
+    );
 
   const ids = (
     await db

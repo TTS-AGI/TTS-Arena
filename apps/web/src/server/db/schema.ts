@@ -38,6 +38,14 @@ export const users = sqliteTable("users", {
   showInLeaderboard: integer("show_in_leaderboard", { mode: "boolean" })
     .notNull()
     .default(true),
+
+  // ── Anti-fraud ──
+  /** Trust score 0–100 (100 = fully trusted); lowered by the security sweep. */
+  trustScore: real("trust_score").notNull().default(100),
+  /** When true, none of the user's votes count toward public ratings. */
+  quarantined: integer("quarantined", { mode: "boolean" })
+    .notNull()
+    .default(false),
 });
 
 /* ── User logins (full history for abuse investigation) ───────────────── */
@@ -127,10 +135,18 @@ export const votes = sqliteTable(
     sentenceHash: text("sentence_hash"),
     /** "dataset" | "custom". */
     sentenceOrigin: text("sentence_origin").notNull(),
-    /** Whether this vote affects public ratings. */
+    /** Whether this vote affects public ratings (the anti-fraud gate). */
     countsForPublic: integer("counts_for_public", { mode: "boolean" })
       .notNull()
       .default(true),
+
+    // ── Anti-fraud audit trail ──
+    /** Risk score assigned at vote time (0 = clean; higher = more suspicious). */
+    riskScore: real("risk_score").notNull().default(0),
+    /** JSON array of reason codes that contributed to the risk score. */
+    riskReasons: text("risk_reasons"),
+    /** True if flagged as suspicious (inline or by the sweep). */
+    flagged: integer("flagged", { mode: "boolean" }).notNull().default(false),
 
     /** Seconds between generation and vote (engagement signal). */
     sessionDurationSeconds: real("session_duration_seconds"),
@@ -144,6 +160,9 @@ export const votes = sqliteTable(
     byRejected: index("votes_rejected_idx").on(t.rejectedModelId),
     byType: index("votes_type_idx").on(t.modelType),
     bySentence: index("votes_sentence_idx").on(t.sentenceHash),
+    // Velocity checks: votes by a user over a recent window.
+    byUserTime: index("votes_user_time_idx").on(t.userId, t.createdAt),
+    byFlagged: index("votes_flagged_idx").on(t.flagged),
   }),
 );
 
@@ -214,6 +233,8 @@ export const battleSessions = sqliteTable(
     modelType: text("model_type").notNull(),
     text: text("text").notNull(),
     sentenceHash: text("sentence_hash").notNull(),
+    /** "dataset" (from the prompt pool) | "custom" (user-typed). */
+    sentenceOrigin: text("sentence_origin").notNull().default("custom"),
 
     aModelId: text("a_model_id").notNull(),
     aVoice: text("a_voice").notNull(),
@@ -237,6 +258,49 @@ export const battleSessions = sqliteTable(
     byExpiry: index("battle_sessions_expiry_idx").on(t.expiresAt),
   }),
 );
+
+/* ── Security events (anti-fraud audit feed) ──────────────────────────── */
+export const securityEvents = sqliteTable(
+  "security_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Subject user, when the event is tied to one. */
+    userId: integer("user_id").references(() => users.id),
+    /** IP / fingerprint involved, for cluster events. */
+    ip: text("ip"),
+    fingerprint: text("fingerprint"),
+    /** Event code, e.g. "rapid_votes", "ip_cluster", "manual_flag". */
+    kind: text("kind").notNull(),
+    /** "info" | "warn" | "critical". */
+    severity: text("severity").notNull().default("info"),
+    /** Free-form JSON context (counts, model id, related users, …). */
+    detail: text("detail"),
+    /** Related vote, when applicable. */
+    voteId: integer("vote_id"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(now),
+  },
+  (t) => ({
+    byTime: index("security_events_time_idx").on(t.createdAt),
+    byKind: index("security_events_kind_idx").on(t.kind),
+    bySeverity: index("security_events_severity_idx").on(t.severity),
+    byUser: index("security_events_user_idx").on(t.userId),
+  }),
+);
+
+/* ── Cap.js captcha storage (proof-of-work; no Redis needed) ──────────── */
+export const capChallenges = sqliteTable("cap_challenges", {
+  token: text("token").primaryKey(),
+  data: text("data").notNull(),
+  /** Expiry as unix-epoch milliseconds (Cap uses ms timestamps). */
+  expires: integer("expires").notNull(),
+});
+
+export const capTokens = sqliteTable("cap_tokens", {
+  key: text("key").primaryKey(),
+  expires: integer("expires").notNull(),
+});
 
 /* ── Relations ────────────────────────────────────────────────────────── */
 export const usersRelations = relations(users, ({ many }) => ({
@@ -267,5 +331,6 @@ export type UserRow = typeof users.$inferSelect;
 export type ModelRow = typeof models.$inferSelect;
 export type VoteRow = typeof votes.$inferSelect;
 export type VoiceStatRow = typeof voiceStats.$inferSelect;
+export type SecurityEventRow = typeof securityEvents.$inferSelect;
 
 export { sql };

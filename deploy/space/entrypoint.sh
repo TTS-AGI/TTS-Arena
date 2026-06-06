@@ -19,7 +19,12 @@ echo "[entrypoint] applying migrations + seed (SQLite at $SQLITE_PATH)"
 cd /app/apps/web
 # Apply migrations with bun:sqlite (drizzle-kit's migrate loads better-sqlite3,
 # whose native binary doesn't work under Bun here).
-bun run src/server/db/migrate.ts || echo "[entrypoint] migrate reported an issue (continuing)"
+# Migrations are required — a half-migrated DB breaks features (e.g. the
+# security tables/columns). Log loudly but don't hard-exit the container, so the
+# app still boots and the error is visible in the logs for diagnosis.
+if ! bun run src/server/db/migrate.ts; then
+  echo "[entrypoint] !!! MIGRATION FAILED — DB schema may be out of date" >&2
+fi
 bun run src/server/db/seed.ts || echo "[entrypoint] seed reported an issue (continuing)"
 cd /app
 

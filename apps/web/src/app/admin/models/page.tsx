@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog } from "@base-ui-components/react/dialog";
 import { Switch } from "@base-ui-components/react/switch";
@@ -23,6 +24,7 @@ async function fetchModels(): Promise<AdminModelsResponse> {
 export default function AdminModelsPage() {
   const qc = useQueryClient();
   const toast = useToast();
+  const router = useRouter();
   const [editing, setEditing] = useState<AdminModel | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -106,7 +108,10 @@ export default function AdminModelsPage() {
         enableSorting: false,
         cell: (c) => (
           <button
-            onClick={() => setEditing(c.row.original)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditing(c.row.original);
+            }}
             className="rounded-md bg-fill px-2.5 py-1 text-xs font-medium transition-colors hover:bg-line"
           >
             Edit
@@ -130,6 +135,9 @@ export default function AdminModelsPage() {
         data={data?.models ?? []}
         loading={isLoading}
         emptyMessage="No models seeded yet."
+        onRowClick={(m) =>
+          router.push(`/admin/models/${encodeURIComponent(m.id)}`)
+        }
       />
 
       <EditModelDialog

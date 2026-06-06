@@ -6,13 +6,22 @@
  * session (re-votes are rejected).
  */
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { inArray } from "drizzle-orm";
 import { voteRequestSchema, type VoteResponse } from "@ttsa/shared";
 import { currentUser } from "@/server/auth/user";
+import { cookieSecurity } from "@/server/auth/session";
 import { getSession, deleteSession } from "@/server/arena/session-store";
 import { recordVote } from "@/server/arena/vote";
+import { assessVote, SECURITY } from "@/server/arena/security";
+import { latestFingerprint } from "@/server/auth/logins";
+import { verifyCapToken } from "@/server/security/cap";
 import { db } from "@/server/db/client";
 import { models } from "@/server/db/schema";
+
+/** Cookie marking "captcha solved this session" + its lifetime. */
+const CAP_COOKIE = "ttsa_cap";
+const CAP_TTL_SECONDS = 60 * 60 * 6; // 6h
 
 export async function POST(req: Request) {
   const user = await currentUser();
@@ -42,9 +51,47 @@ export async function POST(req: Request) {
     );
   }
 
+  // Captcha gate: solve once per browser session, then risk-triggered. We track
+  // "solved this session" with a short-lived signed-ish cookie set when a valid
+  // Cap token is presented. If a captcha is required but none/invalid is
+  // supplied, ask the client to solve one and retry — not a hard error (no
+  // tip-off, low friction).
+  const cookieStore = await cookies();
+  const capToken = req.headers.get("x-cap-token");
+  const captchaOk = await verifyCapToken(capToken);
+  const alreadySolvedThisSession = cookieStore.get(CAP_COOKIE)?.value === "1";
+
+  let captchaRequired = false;
+  if (!SECURITY.disabled() && !captchaOk && !alreadySolvedThisSession) {
+    captchaRequired = true;
+    return NextResponse.json({ needsCaptcha: true });
+  }
+  // A freshly validated token marks the session as captcha-cleared.
+  if (captchaOk && !alreadySolvedThisSession) {
+    cookieStore.set(CAP_COOKIE, "1", {
+      httpOnly: true,
+      sameSite: cookieSecurity().sameSite,
+      secure: cookieSecurity().secure,
+      path: "/",
+      maxAge: CAP_TTL_SECONDS,
+    });
+  }
+
   try {
-    // recordVote marks the session voted + applies ratings in one transaction.
-    const result = await recordVote(session, chosen);
+    const durationSeconds = (Date.now() - session.createdAt) / 1000;
+    const fingerprint = await latestFingerprint(user.id);
+    const assessment = await assessVote({
+      user,
+      req,
+      durationSeconds,
+      fingerprint,
+      captchaRequired,
+      captchaOk,
+    });
+
+    // recordVote marks the session voted + applies ratings (only if the
+    // assessment says the vote counts) in one transaction.
+    const result = await recordVote(session, chosen, assessment);
 
     // Reveal display metadata from the DB (current name/url/open for each id)
     // BEFORE deleting the session, so a delete failure can't lose the result.

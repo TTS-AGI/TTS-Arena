@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { ArrowRight, Dices, RotateCcw } from "lucide-react";
 import type {
   GenerateResponse,
   RandomSentenceResponse,
@@ -11,6 +12,7 @@ import { WaveformPlayer, type WaveformHandle } from "./waveform-player";
 import { SNAP } from "./motion";
 import { useAuth } from "./auth";
 import { useToast } from "./toast";
+import { CapModal } from "./cap-modal";
 
 type Phase = "compose" | "generating" | "listen" | "revealed";
 type Side = "a" | "b";
@@ -41,11 +43,19 @@ export function Arena() {
   const toast = useToast();
 
   const [text, setText] = useState("");
+  // The exact prompt last loaded from the pool (Random). The vote counts as a
+  // "dataset" prompt only if the user generates with this text unchanged.
+  const poolText = useRef<string | null>(null);
   const [phase, setPhase] = useState<Phase>("compose");
   const [battle, setBattle] = useState<Battle | null>(null);
   const [winner, setWinner] = useState<Side | null>(null);
   const [reveal, setReveal] = useState<VoteResponse | null>(null);
   const [randomizing, setRandomizing] = useState(false);
+  const [capOpen, setCapOpen] = useState(false);
+  // Cap verification token, reused across votes until the server asks for a new
+  // one (needsCaptcha). Held in a ref so the retry sees the latest value.
+  const capToken = useRef<string | null>(null);
+  const pendingVote = useRef<Side | null>(null);
 
   // Player handles (for autoplay A→B) and per-side "listened enough" state.
   const playerA = useRef<WaveformHandle>(null);
@@ -79,11 +89,13 @@ export function Arena() {
     setListened({ a: false, b: false });
     threshold.current = { a: MIN_LISTEN_SECONDS, b: MIN_LISTEN_SECONDS };
     setPhase("generating");
+    // "dataset" only if this is the pool prompt left exactly as served.
+    const fromPool = poolText.current !== null && poolText.current === trimmed;
     try {
       const res = await fetch("/api/tts/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed }),
+        body: JSON.stringify({ text: trimmed, fromPool }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as {
@@ -119,6 +131,7 @@ export function Arena() {
       }
       const data = (await res.json()) as RandomSentenceResponse;
       setText(data.sentence);
+      poolText.current = data.sentence.trim();
     } catch (e) {
       toast.error(
         "Couldn't fetch a random line",
@@ -135,9 +148,14 @@ export function Arena() {
     setWinner(side);
     setPhase("revealed");
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (capToken.current) headers["x-cap-token"] = capToken.current;
+
       const res = await fetch("/api/tts/vote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ sessionId: battle.sessionId, chosen: side }),
       });
       if (!res.ok) {
@@ -147,7 +165,18 @@ export function Arena() {
         };
         throw new Error(body.detail ?? body.error ?? "vote failed");
       }
-      setReveal((await res.json()) as VoteResponse);
+      const data = (await res.json()) as VoteResponse | { needsCaptcha: true };
+      if ("needsCaptcha" in data) {
+        // Server wants a captcha first; stash the choice, open the modal, and
+        // retry once the token arrives. Used token is single-use → clear it.
+        capToken.current = null;
+        pendingVote.current = side;
+        setPhase(prev);
+        setWinner(null);
+        setCapOpen(true);
+        return;
+      }
+      setReveal(data);
     } catch (e) {
       toast.error(
         "Couldn't record your vote",
@@ -156,6 +185,14 @@ export function Arena() {
       setWinner(null);
       setPhase(prev);
     }
+  }
+
+  function onCapSolved(token: string) {
+    capToken.current = token;
+    setCapOpen(false);
+    const side = pendingVote.current;
+    pendingVote.current = null;
+    if (side) void vote(side);
   }
 
   function reset() {
@@ -197,7 +234,12 @@ export function Arena() {
               className="flex items-center gap-1.5 rounded-full bg-fill px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
               title="Fill with a random line from the dataset"
             >
-              {randomizing ? <Spinner /> : <span aria-hidden>🎲</span>} Random
+              {randomizing ? (
+                <Spinner />
+              ) : (
+                <Dices className="h-4 w-4" aria-hidden />
+              )}{" "}
+              Random
             </button>
           ) : (
             <span />
@@ -210,17 +252,17 @@ export function Arena() {
               <button
                 onClick={generate}
                 disabled={!canGenerate}
-                className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
               >
-                Synthesize →
+                Synthesize <ArrowRight className="h-4 w-4" aria-hidden />
               </button>
             ) : (
               <button
                 onClick={reset}
                 disabled={busy}
-                className="rounded-full bg-fill px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-full bg-fill px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-line disabled:opacity-50"
               >
-                ↺ New round
+                <RotateCcw className="h-4 w-4" aria-hidden /> New round
               </button>
             )}
           </div>
@@ -309,6 +351,15 @@ export function Arena() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CapModal
+        open={capOpen}
+        onSolved={onCapSolved}
+        onClose={() => {
+          setCapOpen(false);
+          pendingVote.current = null;
+        }}
+      />
     </div>
   );
 }

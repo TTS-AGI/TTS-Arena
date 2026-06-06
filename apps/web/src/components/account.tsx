@@ -71,15 +71,19 @@ export function Account() {
                   Admin panel
                 </Link>
               )}
-              <button
-                onClick={() => {
-                  signOut();
-                  setMenu(false);
-                }}
-                className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-fill hover:text-ink"
-              >
-                Sign out
-              </button>
+              <form action="/api/auth/logout" method="post">
+                <button
+                  type="submit"
+                  formTarget="_blank"
+                  onClick={() => {
+                    void signOut();
+                    setMenu(false);
+                  }}
+                  className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-ink-2 transition-colors hover:bg-fill hover:text-ink"
+                >
+                  Sign out
+                </button>
+              </form>
             </motion.div>
           </>
         )}

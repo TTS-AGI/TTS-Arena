@@ -12,6 +12,7 @@ import {
   type OnChangeFn,
 } from "@tanstack/react-table";
 import { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
  * One table component the whole admin reuses. Headless TanStack Table rendered
@@ -180,17 +181,17 @@ export function DataTable<T>({
             type="button"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            className="rounded-md bg-fill px-2.5 py-1 text-xs font-medium transition-colors hover:bg-line disabled:opacity-40"
+            className="flex items-center gap-1 rounded-md bg-fill px-2.5 py-1 text-xs font-medium transition-colors hover:bg-line disabled:opacity-40"
           >
-            ← Prev
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden /> Prev
           </button>
           <button
             type="button"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            className="rounded-md bg-fill px-2.5 py-1 text-xs font-medium transition-colors hover:bg-line disabled:opacity-40"
+            className="flex items-center gap-1 rounded-md bg-fill px-2.5 py-1 text-xs font-medium transition-colors hover:bg-line disabled:opacity-40"
           >
-            Next →
+            Next <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </button>
         </div>
       </div>

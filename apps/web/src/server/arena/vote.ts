@@ -17,13 +17,15 @@ import {
   votes,
   type ModelRow,
 } from "../db/schema";
-import { isDatasetPrompt, markConsumed } from "./sentences";
 import type { BattleSession } from "./session-store";
+import type { Assessment } from "./security";
+import { logSecurityEvent } from "../security/events";
 
 export type VoteResult = {
   chosenModelId: string;
   rejectedModelId: string;
   counted: boolean;
+  flagged: boolean;
 };
 
 function glickoOf(m: ModelRow): Glicko {
@@ -33,15 +35,23 @@ function glickoOf(m: ModelRow): Glicko {
 export async function recordVote(
   session: BattleSession,
   chosenKey: "a" | "b",
+  assessment?: Assessment,
 ): Promise<VoteResult> {
   const chosenSide = session[chosenKey];
   const rejectedSide = session[chosenKey === "a" ? "b" : "a"];
 
-  // Origin is still recorded (so custom-prompt votes can be down-weighted or
-  // audited later if gaming becomes a concern), but all votes currently count
-  // toward the public board — there's no dataset-prompt flow in the UI.
-  const origin = (await isDatasetPrompt(session.text)) ? "dataset" : "custom";
-  const counts = true;
+  // Origin was decided at generate time (pool prompt left unchanged = "dataset",
+  // otherwise "custom") and carried on the session.
+  const origin = session.origin;
+
+  // Anti-fraud gate: a flagged (or blocked) vote is still stored, but does NOT
+  // count toward public ratings — the rating math below is skipped entirely.
+  const flagged = assessment?.flag ?? false;
+  const counts = !flagged && !(assessment?.block ?? false);
+  const riskScore = assessment?.riskScore ?? 0;
+  const riskReasons = assessment?.reasons.length
+    ? JSON.stringify(assessment.reasons)
+    : null;
 
   // The SQLite driver (bun:sqlite / better-sqlite3) is synchronous, so the
   // transaction callback must be synchronous too — no `await` inside, or the
@@ -51,6 +61,7 @@ export async function recordVote(
   // Wrapped in withWriteRetry because bun:sqlite doesn't wait on a held write
   // lock; the whole vote (mark-voted + rating updates) is one transaction so a
   // retry re-runs atomically.
+  let insertedVoteId = 0;
   await withWriteRetry(() =>
     db.transaction((tx) => {
       // 0. Mark the session voted (idempotency guard lives in the same tx).
@@ -75,11 +86,15 @@ export async function recordVote(
           sentenceHash: session.sentenceHash,
           sentenceOrigin: origin,
           countsForPublic: counts,
+          riskScore,
+          riskReasons,
+          flagged,
           sessionDurationSeconds: (Date.now() - session.createdAt) / 1000,
         })
         .returning({ id: votes.id })
         .all();
       const voteId = vote!.id;
+      insertedVoteId = voteId;
 
       if (!counts) return;
 
@@ -149,14 +164,22 @@ export async function recordVote(
     }),
   );
 
-  if (counts && origin === "dataset") {
-    await markConsumed(session.text);
+  // Record a security event for flagged/blocked votes (best-effort, async).
+  if (flagged && assessment) {
+    await logSecurityEvent({
+      userId: session.userId,
+      kind: assessment.block ? "vote_blocked" : "vote_flagged",
+      severity: assessment.block ? "critical" : "warn",
+      voteId: insertedVoteId || null,
+      detail: { riskScore, reasons: assessment.reasons },
+    });
   }
 
   return {
     chosenModelId: chosenSide.modelId,
     rejectedModelId: rejectedSide.modelId,
     counted: counts,
+    flagged,
   };
 }
 
