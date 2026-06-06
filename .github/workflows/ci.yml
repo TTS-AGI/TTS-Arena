@@ -28,7 +28,10 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pin to the version that writes the lockfile (the Space image uses
+          # bun 1.1.42 too). "latest" drifted and failed to resolve the newer
+          # apps/docs deps from a 1.1.42-written lockfile.
+          bun-version: 1.1.42
 
       - name: Install dependencies
         run: bun install

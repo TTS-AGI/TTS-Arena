@@ -127,6 +127,7 @@ const CREDITS = [
 ];
 
 const LINKS = [
+  { label: "Docs", href: "https://docs.ttsarena.org/" },
   { label: "Discord", href: "https://discord.gg/HB8fMR6GTr" },
   { label: "X", href: "https://x.com/realmrfakename" },
   { label: "GitHub", href: "https://github.com/TTS-AGI/TTS-Arena" },

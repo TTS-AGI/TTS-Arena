@@ -1,0 +1,62 @@
+name: Deploy Docs to Hugging Face Space
+
+# Pushes apps/docs to the TTS-AGI/docs Space (served at https://docs.ttsarena.org).
+# Runs after CI passes on main. The Space builds the Dockerfile itself.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  HF_OWNER: TTS-AGI
+  HF_SPACE: docs
+
+jobs:
+  deploy:
+    name: Sync docs to Space
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Push to the docs Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          REMOTE="https://${HF_OWNER}:${HF_TOKEN}@huggingface.co/spaces/${HF_OWNER}/${HF_SPACE}"
+
+          # The docs app is self-contained (no @ttsa/* workspace deps), and its
+          # Dockerfile builds apps/docs in isolation. So the Space only needs the
+          # apps/docs tree + the Dockerfile + README — nothing else from the
+          # monorepo (no LFS corpus, no sibling apps, no native deps).
+          DEST=/tmp/docs-space
+          rm -rf "$DEST" && mkdir -p "$DEST/apps/docs"
+          rsync -a \
+            --exclude='.git' --exclude='node_modules' --exclude='.next' \
+            --exclude='.source' \
+            apps/docs/ "$DEST/apps/docs/"
+          cp Dockerfile.docs "$DEST/Dockerfile"
+          cp SPACES_DOCS_README.md "$DEST/README.md"
+
+          # Single fresh commit (orphan history). Plain text — no LFS.
+          cd "$DEST"
+          git init -q
+          git checkout -q -b main
+          git add -A
+          git commit -q -m "Deploy docs from github.com/${{ github.repository }}@${GITHUB_SHA::7}"
+          git push -f "$REMOTE" main

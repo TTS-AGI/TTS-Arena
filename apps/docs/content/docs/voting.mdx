@@ -1,0 +1,42 @@
+---
+title: Voting
+description: What makes a vote count, and the rules that keep the board fair.
+---
+
+## Casting a vote
+
+1. Type a line, or hit **Random** for one from the prompt pool.
+2. Two anonymous models — **A** and **B** — synthesize it.
+3. Listen to both, then pick the one that sounds more human. One choice, no
+   skips.
+4. Both models' ratings update, and their identities are revealed.
+
+You need to listen to enough of each clip before voting unlocks — this keeps
+votes grounded in the audio rather than reflexive clicks.
+
+## Requirements
+
+- **Sign in with Hugging Face.** Voting is tied to your account so each vote
+  counts once. Accounts must be at least **30 days old**.
+- **English only**, for now — it's the language all models support. Multilingual
+  is on the roadmap.
+- Prompts are capped at **1,000 characters**.
+
+## Keeping it fair
+
+A crowdsourced leaderboard is only as good as its integrity, so votes run
+through an anti-abuse system:
+
+- **Behavioral signals** score each vote for risk (timing, patterns, device and
+  network signals). High-risk votes are recorded but **shadow-excluded** — they
+  never move the public ratings.
+- A lightweight **proof-of-work captcha** appears once per session, and again if
+  risk rises.
+- A background sweep looks for coordinated rings (many accounts sharing an IP or
+  fingerprint piling onto one model) and per-account bias, retroactively
+  excluding suspicious votes and recomputing the board from the clean set.
+
+<Callout>
+  None of this affects honest voting — it's invisible unless your activity looks
+  automated or coordinated.
+</Callout>

@@ -1,0 +1,33 @@
+{
+  "name": "@ttsa/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "fumadocs-mdx && next build --webpack",
+    "dev": "fumadocs-mdx && next dev",
+    "start": "next start",
+    "typecheck": "echo 'docs: typecheck handled by next build (fumadocs MDX types are build-time)'",
+    "lint": "echo 'no lint for docs'"
+  },
+  "dependencies": {
+    "fumadocs-core": "16.9.3",
+    "fumadocs-mdx": "15.0.11",
+    "fumadocs-ui": "16.9.3",
+    "lucide-react": "^1.17.0",
+    "next": "16.2.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3"
+  }
+}

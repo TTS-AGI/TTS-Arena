@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1
+#
+# Hugging Face Space image for the docs site (Fumadocs/Next.js). The docs app is
+# fully self-contained — it has no @ttsa/* workspace dependencies — so we build
+# it in isolation, NOT as part of the monorepo workspace. That avoids pulling in
+# unrelated packages (e.g. web's native better-sqlite3) that would need a build
+# toolchain and have nothing to do with the docs.
+FROM oven/bun:1.1.42-debian AS base
+WORKDIR /app/docs
+
+# ── deps ──
+FROM base AS deps
+# Standalone install: only the docs package.json (no root workspace context).
+COPY apps/docs/package.json ./package.json
+RUN bun install
+
+# ── build ──
+FROM base AS build
+COPY --from=deps /app/docs/node_modules ./node_modules
+COPY apps/docs/ ./
+RUN bun run build
+# Stage a flat runtime dir. In this isolated build (no parent workspace) Next's
+# standalone output is flat — server.js, node_modules and package.json at the
+# standalone root — but we locate server.js explicitly so the image is correct
+# regardless of any workspace-root inference, then add the static + public dirs
+# the standalone server expects beside it.
+RUN set -e; \
+    SA="$PWD/.next/standalone"; \
+    SERVER="$(find "$SA" -name server.js -not -path '*/node_modules/*' | head -1)"; \
+    test -n "$SERVER"; \
+    ROOT="$(dirname "$SERVER")"; \
+    mkdir -p "$ROOT/.next"; \
+    cp -a "$PWD/.next/static" "$ROOT/.next/static"; \
+    [ -d "$PWD/public" ] && cp -a "$PWD/public" "$ROOT/public" || true; \
+    cp -a "$ROOT" /out
+
+# ── runtime ──
+FROM base AS runtime
+ENV NODE_ENV=production
+ENV PORT=7860
+ENV HOSTNAME=0.0.0.0
+EXPOSE 7860
+
+WORKDIR /app
+COPY --from=build /out/ ./
+CMD ["bun", "server.js"]

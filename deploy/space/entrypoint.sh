@@ -20,26 +20,46 @@ export AUDIO_LOG_DIR="/audio"
 # longer opens in WAL mode, a leftover -wal/-shm can confuse recovery.
 rm -f "${SQLITE_PATH}-wal" "${SQLITE_PATH}-shm" 2>/dev/null || true
 
-# Integrity guard: if the DB file exists but is corrupt, salvage what's readable
-# into a fresh file via sqlite3 .recover, keeping a timestamped copy of the
-# corrupt original. Better to come back up with the recoverable rows than to
-# loop on a malformed file. No-op when the DB is healthy or absent.
+# Integrity guard. Two failure modes have bitten us on the networked bucket:
+#   1. the file is outright malformed (integrity_check fails), and
+#   2. integrity_check says "ok" yet specific INDEXED queries still throw
+#      "database disk image is malformed" — a corrupt index page that the
+#      high-level check doesn't flag.
+# So: if integrity_check fails, salvage via .recover. Then ALWAYS rebuild
+# indexes and rewrite the file (REINDEX + VACUUM) — cheap on a small DB and the
+# reliable fix for case 2. A successful VACUUM produces a clean, defragmented
+# file with freshly built indexes.
 if [ -f "$SQLITE_PATH" ]; then
-  check="$(sqlite3 "$SQLITE_PATH" 'PRAGMA integrity_check;' 2>&1 | head -1 || echo "error")"
-  if [ "$check" != "ok" ]; then
-    echo "[entrypoint] !!! DB integrity check failed ($check) — attempting recovery" >&2
-    ts="$(date -u +%Y%m%d%H%M%S)"
-    cp -f "$SQLITE_PATH" "${SQLITE_PATH}.corrupt-${ts}" 2>/dev/null || true
-    if sqlite3 "$SQLITE_PATH" ".recover" 2>/dev/null | sqlite3 "${SQLITE_PATH}.recovered-${ts}" 2>/dev/null \
-       && [ -s "${SQLITE_PATH}.recovered-${ts}" ]; then
-      mv -f "${SQLITE_PATH}.recovered-${ts}" "$SQLITE_PATH"
-      rm -f "${SQLITE_PATH}-wal" "${SQLITE_PATH}-shm" 2>/dev/null || true
-      echo "[entrypoint] recovery succeeded; corrupt original kept at ${SQLITE_PATH}.corrupt-${ts}" >&2
-    else
-      echo "[entrypoint] !!! recovery FAILED — leaving original in place for manual inspection" >&2
-    fi
+  ts="$(date -u +%Y%m%d%H%M%S)"
+  rm -f "${SQLITE_PATH}-wal" "${SQLITE_PATH}-shm" 2>/dev/null || true
+
+  # REINDEX + VACUUM was not enough (integrity_check=ok and VACUUM=ok, yet the
+  # app's indexed queries still threw "malformed"). So rebuild the DB the
+  # thorough way: dump the whole thing to SQL and reload into a fresh file. This
+  # discards every page/index/b-tree and reconstructs them from the row data via
+  # the schema — the strongest file-level repair short of manual surgery.
+  #
+  # Prefer .dump (lossless when the DB is readable); fall back to .recover
+  # (salvages a genuinely corrupt file). Whatever lands, it's a brand-new file.
+  rebuilt=""
+  if sqlite3 "$SQLITE_PATH" ".dump" 2>/dev/null | sqlite3 "${SQLITE_PATH}.rebuilt-${ts}" 2>/dev/null \
+     && [ -s "${SQLITE_PATH}.rebuilt-${ts}" ] \
+     && [ "$(sqlite3 "${SQLITE_PATH}.rebuilt-${ts}" 'PRAGMA integrity_check;' 2>&1 | head -1)" = "ok" ]; then
+    rebuilt="dump"
+  elif sqlite3 "$SQLITE_PATH" ".recover" 2>/dev/null | sqlite3 "${SQLITE_PATH}.rebuilt-${ts}" 2>/dev/null \
+     && [ -s "${SQLITE_PATH}.rebuilt-${ts}" ]; then
+    rebuilt="recover"
+  fi
+
+  if [ -n "$rebuilt" ]; then
+    cp -f "$SQLITE_PATH" "${SQLITE_PATH}.prerebuild-${ts}" 2>/dev/null || true
+    mv -f "${SQLITE_PATH}.rebuilt-${ts}" "$SQLITE_PATH"
+    rm -f "${SQLITE_PATH}-wal" "${SQLITE_PATH}-shm" 2>/dev/null || true
+    sqlite3 "$SQLITE_PATH" 'PRAGMA journal_mode=DELETE;' >/dev/null 2>&1 || true
+    echo "[entrypoint] DB rebuilt via .$rebuilt (pre-rebuild copy at ${SQLITE_PATH}.prerebuild-${ts})"
   else
-    echo "[entrypoint] DB integrity check: ok"
+    rm -f "${SQLITE_PATH}.rebuilt-${ts}" 2>/dev/null || true
+    echo "[entrypoint] !!! DB rebuild FAILED — leaving file as-is" >&2
   fi
 fi
 

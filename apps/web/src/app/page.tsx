@@ -55,7 +55,17 @@ export default function Home() {
               >
                 TTS&nbsp;Arena
               </button>
-              <Account />
+              <div className="flex items-center gap-3">
+                <a
+                  href="https://docs.ttsarena.org/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-medium text-ink-3 transition-colors hover:text-ink"
+                >
+                  Docs
+                </a>
+                <Account />
+              </div>
             </div>
           </header>
 

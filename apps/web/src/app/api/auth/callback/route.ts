@@ -66,6 +66,10 @@ export async function GET(req: NextRequest) {
     return home();
   } catch (err) {
     const info = errInfo(err);
+    // Always log to the container output too — if the DB write below is itself
+    // the failure, the error_events insert won't help, so we must not rely on
+    // it alone.
+    console.error("[auth/callback] failed:", info.stack ?? info.message);
     void logErrorEvent({
       source: "auth_callback",
       message: info.message,

@@ -1,0 +1,40 @@
+---
+title: How ranking works
+description: Glicko-2 while provisional, Bradley–Terry once established.
+---
+
+Every vote is a head-to-head result between two models. We turn that stream of
+pairwise outcomes into a single leaderboard with a two-stage rating system.
+
+## Provisional: Glicko-2
+
+A new model starts with a live **Glicko-2** rating (centered on 1500) and a
+high rating deviation — the system is uncertain about it, so its position can
+move quickly. While a model has fewer than the established threshold of counted
+votes, it's shown as **provisional** on the board.
+
+This stage exists so a freshly added model appears almost immediately and finds
+its rough level within a handful of matchups, without waiting for thousands of
+votes.
+
+## Established: Bradley–Terry
+
+Once a model passes the threshold, its standing is fixed by a **Bradley–Terry**
+fit computed over the full history of matchups. Rather than leaning on the last
+few votes, the board reflects _all_ the evidence at once — the maximum-likelihood
+strengths that best explain every recorded head-to-head.
+
+The fit is cached and recomputed as new votes accumulate, so the established
+portion of the board stays current without refitting on every single vote.
+
+## Why blind, why pairwise
+
+Naming a model colors how people hear it, so identities stay hidden until after
+the vote. And pairwise preference ("which is better, A or B?") is far easier and
+more reliable for listeners than scoring a clip in isolation — the same reason
+listening tests have always been comparative.
+
+<Callout type="info">
+  Only **clean** votes count toward ratings. Votes flagged by the anti-fraud
+  system, and votes from quarantined accounts, are excluded from the fit.
+</Callout>

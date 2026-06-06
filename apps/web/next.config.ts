@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
   // required at runtime (and traced into the standalone bundle) rather than
   // being bundled by webpack.
   serverExternalPackages: ["better-sqlite3"],
+  // The HF Space builder has a tight memory cap; the default multi-worker
+  // prerender was getting OOMKilled. Prerender in a single worker to keep peak
+  // memory well under the limit (slower build, but it completes).
+  experimental: {
+    cpus: 1,
+    workerThreads: false,
+  },
   webpack: (config) => {
     // `bun:sqlite` only exists in the Bun runtime; the DB client requires it
     // dynamically there. Mark it external so the Node/webpack build doesn't try

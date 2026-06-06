@@ -10,6 +10,9 @@ bun.lockb
 *.tsbuildinfo
 next-env.d.ts
 
+# fumadocs generated content (regenerated on install/build)
+**/.source/**
+
 # drizzle generated migrations
 **/drizzle/**
 

@@ -1,0 +1,41 @@
+---
+title: Introduction
+description: A crowdsourced, blind benchmark for text-to-speech.
+---
+
+**TTS Arena** ranks text-to-speech models the only way that really matters — by
+ear, in a blind head-to-head. You type a line, two anonymous models read it
+back, and you pick the one that sounds more human. Every vote updates the
+leaderboard.
+
+## Why it exists
+
+Speech synthesis has never had a good yardstick. Word error rate measures
+intelligibility, not whether a voice sounds alive; mean opinion scores depend on
+a handful of listeners in a lab. TTS Arena replaces both with open, large-scale
+human preference: anyone can listen, compare, and vote, and the rankings that
+fall out belong to everyone.
+
+## How it works
+
+<Cards>
+  <Card title="How ranking works" href="/docs/ranking">
+    Glicko-2 while a model is provisional, Bradley–Terry once it's established.
+  </Card>
+  <Card title="Voting" href="/docs/voting">
+    What makes a vote count, and the rules that keep the board fair.
+  </Card>
+  <Card title="Submit a model" href="/docs/submit-a-model">
+    Add your model for evaluation — public or anonymous pre-release.
+  </Card>
+  <Card title="Provider API" href="/docs/api">
+    The contract your TTS endpoint needs to meet to join the arena.
+  </Card>
+</Cards>
+
+## Quick facts
+
+- Sign in with Hugging Face to vote — accounts must be at least 30 days old.
+- Prompts are English-only for now and capped at 1,000 characters.
+- Models stay anonymous until you've voted; only then are A and B revealed.
+- New models appear quickly and settle as votes accumulate.

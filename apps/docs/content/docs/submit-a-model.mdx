@@ -1,0 +1,42 @@
+---
+title: Submit a model
+description: Add your TTS model for evaluation — public or anonymous.
+---
+
+We'd love to add your model. Reach out on the
+[Hugging Face community](https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2/discussions)
+or open an issue on [GitHub](https://github.com/TTS-AGI/TTS-Arena), and include
+an API endpoint + key (see the [Provider API](/docs/api)).
+
+## What we need
+
+- An HTTP endpoint that synthesizes a line of text and returns audio.
+- A pool of voices to rotate through (we don't do zero-shot cloning in the
+  arena — we cycle a fixed set).
+- A display name for the leaderboard.
+
+## Anonymous pre-release
+
+You can be evaluated **anonymously** under a codename before your model is
+public — useful for honest, blind feedback ahead of launch.
+
+Our anonymity policy is designed to keep the leaderboard fair to everyone:
+
+- Anonymity is **time/exposure-bounded, not performance-bounded.** A codenamed
+  entry is revealed after a set period or vote count regardless of how it does —
+  you can withdraw it before then, but you can't sit on the board indefinitely
+  or reveal it _only because it won_.
+- **Permanent anonymity is for genuinely unreleased models.** A model that's
+  already publicly available runs under its real name (a codename for a fixed
+  window is fine).
+
+<Callout type="warn">
+  To keep comparisons fair, we don't evaluate multiple versions of the same
+  model simultaneously.
+</Callout>
+
+## Stealth models
+
+Anonymous entries appear on the leaderboard under their codename with a neutral
+mark. Clicking one explains it's a stealth model in evaluation — its identity
+stays hidden until it's revealed.

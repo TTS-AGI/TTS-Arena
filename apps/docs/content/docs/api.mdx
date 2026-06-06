@@ -1,0 +1,53 @@
+---
+title: Provider API
+description: The contract your TTS endpoint needs to join the arena.
+---
+
+The arena talks to your model through a small HTTP contract. Our router calls
+your endpoint server-side, downloads the audio, and proxies it to the client —
+so the response never reaches the browser directly and your keys stay private.
+
+## The request
+
+We send a line of text and (optionally) a voice id. Your endpoint synthesizes it
+and returns audio. A typical shape:
+
+```http
+POST https://your-api.example.com/tts
+Authorization: Bearer <key>
+Content-Type: application/json
+
+{
+  "text": "The quick brown fox jumps over the lazy dog.",
+  "voice_id": "one-of-your-voice-ids"
+}
+```
+
+The exact field names are flexible — we adapt a small provider adapter per
+model. What matters is that, given text, you return speech.
+
+## The response
+
+Either is fine:
+
+- **Raw audio bytes** (`audio/mpeg`, `audio/wav`, …) returned directly, or
+- **JSON** containing base64 audio or a public URL we can download.
+
+Common formats (mp3, wav, ogg, flac, opus) all work; we normalize on our side.
+
+## Voices
+
+The arena cycles a **fixed pool of voices** rather than cloning. Provide a list
+of voice ids and we rotate through them across battles, so a model is judged
+across its range rather than a single voice.
+
+## Reliability
+
+- Aim to respond within ~60s for a sentence-length prompt.
+- Return a non-2xx (or an error payload) on failure — we record it, retry with
+  another model, and surface failing models in our admin tooling.
+
+<Callout type="info">
+  Latency and success rate are tracked per model. A model that fails frequently
+  can be temporarily timed out so it doesn't disrupt battles.
+</Callout>
