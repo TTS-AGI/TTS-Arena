@@ -4,7 +4,7 @@
  * requireAdmin). Timestamps are returned as unix-epoch seconds (the column
  * mode is "timestamp" → JS Date; we convert to epoch for the JSON contract).
  */
-import { and, asc, desc, eq, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, like, sql } from "drizzle-orm";
 import type {
   AdminAnalytics,
   AdminErrorOverview,
@@ -28,6 +28,8 @@ import {
   models,
   ratingHistory,
   securityEvents,
+  testResults,
+  testRuns,
   userLogins,
   users,
   voiceStats,
@@ -184,8 +186,10 @@ export async function listModels(): Promise<AdminModel[]> {
       id: m.id,
       name: m.name,
       modelType: m.modelType,
+      provider: m.provider,
       isOpen: m.isOpen,
       isActive: m.isActive,
+      timedOutUntil: m.timedOutUntil ? epoch(m.timedOutUntil) : null,
       url: m.url,
       icon: m.icon,
       rating: m.rating,
@@ -197,6 +201,134 @@ export async function listModels(): Promise<AdminModel[]> {
       updatedAt: epoch(m.updatedAt),
     }))
     .sort((a, b) => b.rating - a.rating);
+}
+
+/* ── Test runs ("Test All") ───────────────────────────────────────────── */
+
+export async function listTestRuns(opts: {
+  page: number;
+  pageSize: number;
+}): Promise<{
+  rows: import("@ttsa/shared").AdminTestRun[];
+  total: number;
+}> {
+  const { page, pageSize } = opts;
+  const totalRows = await db
+    .select({ c: sql<number>`count(*)` })
+    .from(testRuns);
+  const rows = await db
+    .select()
+    .from(testRuns)
+    .orderBy(desc(testRuns.createdAt))
+    .limit(pageSize)
+    .offset(page * pageSize);
+  return {
+    total: countRows(totalRows),
+    rows: rows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      sentence: r.sentence,
+      total: r.total,
+      completed: r.completed,
+      passed: r.passed,
+      failed: r.failed,
+      startedBy: r.startedBy,
+      createdAt: epoch(r.createdAt),
+      finishedAt: r.finishedAt ? epoch(r.finishedAt) : null,
+    })),
+  };
+}
+
+export async function testRunDetail(
+  runId: number,
+): Promise<import("@ttsa/shared").AdminTestRunDetail | null> {
+  const run = await db.query.testRuns.findFirst({
+    where: eq(testRuns.id, runId),
+  });
+  if (!run) return null;
+  const results = await db
+    .select()
+    .from(testResults)
+    .where(eq(testResults.runId, runId))
+    .orderBy(asc(testResults.id));
+  return {
+    run: {
+      id: run.id,
+      status: run.status,
+      sentence: run.sentence,
+      total: run.total,
+      completed: run.completed,
+      passed: run.passed,
+      failed: run.failed,
+      startedBy: run.startedBy,
+      createdAt: epoch(run.createdAt),
+      finishedAt: run.finishedAt ? epoch(run.finishedAt) : null,
+    },
+    results: results.map((r) => ({
+      id: r.id,
+      model: r.model,
+      modelName: r.modelName,
+      provider: r.provider,
+      status: r.status,
+      durationMs: r.durationMs ?? null,
+      audioUrl: r.audioPath
+        ? `/api/admin/tests/audio/${encodeURIComponent(r.audioPath)}`
+        : null,
+      error: r.error,
+    })),
+  };
+}
+
+/** Whether a run is currently active (used to gate starting a new one). */
+export async function hasRunningTestRun(): Promise<boolean> {
+  const rows = await db
+    .select({ id: testRuns.id })
+    .from(testRuns)
+    .where(eq(testRuns.status, "running"))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/* ── Model time-out (temporary deactivation, distinct from isActive) ────── */
+
+/** Time a model out for `hours` (suppressed from battles until then). */
+export async function timeOutModel(
+  id: string,
+  hours: number,
+): Promise<boolean> {
+  const until = new Date(Date.now() + hours * 3600_000);
+  const updated = await withWriteRetry(() =>
+    db
+      .update(models)
+      .set({ timedOutUntil: until, updatedAt: new Date() })
+      .where(eq(models.id, id))
+      .returning({ id: models.id }),
+  );
+  return updated.length > 0;
+}
+
+/** Clear a single model's time-out. */
+export async function clearModelTimeout(id: string): Promise<boolean> {
+  const updated = await withWriteRetry(() =>
+    db
+      .update(models)
+      .set({ timedOutUntil: null, updatedAt: new Date() })
+      .where(eq(models.id, id))
+      .returning({ id: models.id }),
+  );
+  return updated.length > 0;
+}
+
+/** Clear ALL model time-outs. Returns how many were cleared. */
+export async function clearAllModelTimeouts(): Promise<number> {
+  const cleared = await withWriteRetry(() =>
+    db
+      .update(models)
+      .set({ timedOutUntil: null, updatedAt: new Date() })
+      .where(isNotNull(models.timedOutUntil))
+      .returning({ id: models.id }),
+  );
+  return cleared.length;
 }
 
 export async function updateModel(

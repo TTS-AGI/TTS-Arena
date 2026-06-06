@@ -51,8 +51,11 @@ export const adminModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   modelType: z.string(),
+  provider: z.string().nullable(),
   isOpen: z.boolean(),
   isActive: z.boolean(),
+  /** Epoch seconds until which the model is timed out, or null. */
+  timedOutUntil: z.number().int().nullable(),
   url: z.string().nullable(),
   icon: z.string().nullable(),
   rating: z.number(),
@@ -402,3 +405,44 @@ export const adminGenerationOverviewSchema = z.object({
 export type AdminGenerationOverview = z.infer<
   typeof adminGenerationOverviewSchema
 >;
+
+/* ── Test runs ("Test All") ───────────────────────────────────────────── */
+
+export const adminTestRunSchema = z.object({
+  id: z.number().int(),
+  status: z.string(), // running | done | interrupted
+  sentence: z.string(),
+  total: z.number().int(),
+  completed: z.number().int(),
+  passed: z.number().int(),
+  failed: z.number().int(),
+  startedBy: z.string().nullable(),
+  createdAt: z.number().int(),
+  finishedAt: z.number().int().nullable(),
+});
+export type AdminTestRun = z.infer<typeof adminTestRunSchema>;
+
+export const adminTestRunsResponseSchema = z.object({
+  rows: z.array(adminTestRunSchema),
+  total: z.number().int(),
+});
+export type AdminTestRunsResponse = z.infer<typeof adminTestRunsResponseSchema>;
+
+export const adminTestResultSchema = z.object({
+  id: z.number().int(),
+  model: z.string(),
+  modelName: z.string(),
+  provider: z.string().nullable(),
+  status: z.string(), // pending | running | pass | fail
+  durationMs: z.number().int().nullable(),
+  /** Audio URL when a sample was produced (served by the test audio route). */
+  audioUrl: z.string().nullable(),
+  error: z.string().nullable(),
+});
+export type AdminTestResult = z.infer<typeof adminTestResultSchema>;
+
+export const adminTestRunDetailSchema = z.object({
+  run: adminTestRunSchema,
+  results: z.array(adminTestResultSchema),
+});
+export type AdminTestRunDetail = z.infer<typeof adminTestRunDetailSchema>;

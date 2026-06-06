@@ -9,6 +9,7 @@ import { PageHeader, StatCard } from "@/components/admin/shell";
 import { fmtDate, truncate } from "@/components/admin/data-table";
 import { AreaChartCard, HBarChartCard } from "@/components/admin/charts";
 import { useToast } from "@/components/toast";
+import { Alert } from "@/components/alert";
 
 async function fetchUser(id: string): Promise<AdminUserDetail> {
   const res = await fetch(`/api/admin/users/${id}`);
@@ -93,13 +94,9 @@ export default function AdminUserDetailPage({
       ) : (
         <div className="flex flex-col gap-5">
           {data.user.quarantined && (
-            <div className="card border-l-4 border-l-accent px-4 py-3 text-sm">
-              <span className="font-semibold text-accent">Quarantined</span>
-              <span className="text-ink-2">
-                {" "}
-                — this user’s votes don’t count toward ratings.
-              </span>
-            </div>
+            <Alert tone="warning" title="Quarantined">
+              this user’s votes don’t count toward ratings.
+            </Alert>
           )}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

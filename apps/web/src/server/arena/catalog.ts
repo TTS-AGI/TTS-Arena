@@ -81,6 +81,7 @@ export async function ensureModelsSeeded(dtos: ArenaModelDTO[]): Promise<void> {
             id: m.id,
             name: m.name,
             modelType: "tts",
+            provider: m.provider,
             isOpen: m.open,
             isActive: m.enabled,
             url: m.url,
@@ -88,11 +89,12 @@ export async function ensureModelsSeeded(dtos: ArenaModelDTO[]): Promise<void> {
           })
           .onConflictDoUpdate({
             target: modelsTable.id,
-            // Refresh display metadata only — never reset rating/counts.
+            // Refresh display metadata only — never reset rating/counts, and
+            // don't touch isActive (admin-controlled) or timedOutUntil.
             set: {
               name: m.name,
+              provider: m.provider,
               isOpen: m.open,
-              isActive: m.enabled,
               url: m.url,
               icon: m.icon ?? null,
               updatedAt: new Date(),

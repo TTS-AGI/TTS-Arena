@@ -43,6 +43,7 @@ async function seed() {
         id: m.id,
         name: m.name,
         modelType: "tts",
+        provider: m.provider,
         isOpen: m.open,
         isActive: m.enabled,
         url: m.url,
@@ -55,6 +56,7 @@ async function seed() {
         // admin turned off.
         set: {
           name: m.name,
+          provider: m.provider,
           isOpen: m.open,
           url: m.url,
           icon: m.icon ?? null,

@@ -79,8 +79,16 @@ export const models = sqliteTable("models", {
   name: text("name").notNull(),
   /** "tts" | "conversational". */
   modelType: text("model_type").notNull(),
+  /** Provider id (from the router catalog), for grouping/filtering in admin. */
+  provider: text("provider"),
   isOpen: integer("is_open", { mode: "boolean" }).notNull().default(false),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  /**
+   * Temporary time-out: if set and in the future, the model is suppressed from
+   * battles until then (e.g. an admin times out a failing model for a few
+   * hours). Distinct from isActive, which is a manual on/off the admin controls.
+   */
+  timedOutUntil: integer("timed_out_until", { mode: "timestamp" }),
   url: text("url"),
   /** Optional provider logo URL shown on the leaderboard. */
   icon: text("icon"),
@@ -367,6 +375,67 @@ export const generationEvents = sqliteTable(
   }),
 );
 
+/* ── Test runs ("Test All": synth every model, record pass/fail) ───────── */
+/**
+ * A "Test All" run, kicked off by an admin. Runs server-side in the background:
+ * one fixed sentence is synthesized per model, each result stored in
+ * test_results. The run row tracks overall progress so the admin can leave and
+ * come back, watch live, and browse history. State machine: running → done
+ * (or interrupted if the process restarts mid-run; the runner resumes pending).
+ */
+export const testRuns = sqliteTable(
+  "test_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** "running" | "done" | "interrupted". */
+    status: text("status").notNull().default("running"),
+    /** The sentence synthesized for every model in this run. */
+    sentence: text("sentence").notNull(),
+    total: integer("total").notNull().default(0),
+    completed: integer("completed").notNull().default(0),
+    passed: integer("passed").notNull().default(0),
+    failed: integer("failed").notNull().default(0),
+    /** Admin who started it (username), informational. */
+    startedBy: text("started_by"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(now),
+    finishedAt: integer("finished_at", { mode: "timestamp" }),
+  },
+  (t) => ({
+    byTime: index("test_runs_time_idx").on(t.createdAt),
+    byStatus: index("test_runs_status_idx").on(t.status),
+  }),
+);
+
+/** One per (run, model): a pending job that the runner fills in as it goes. */
+export const testResults = sqliteTable(
+  "test_results",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: integer("run_id")
+      .notNull()
+      .references(() => testRuns.id, { onDelete: "cascade" }),
+    model: text("model").notNull(),
+    modelName: text("model_name").notNull(),
+    provider: text("provider"),
+    /** "pending" | "running" | "pass" | "fail". */
+    status: text("status").notNull().default("pending"),
+    durationMs: integer("duration_ms"),
+    /** Relative path under the run's audio dir, when a sample was produced. */
+    audioPath: text("audio_path"),
+    extension: text("extension"),
+    error: text("error"),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(now),
+  },
+  (t) => ({
+    byRun: index("test_results_run_idx").on(t.runId),
+    byRunStatus: index("test_results_run_status_idx").on(t.runId, t.status),
+  }),
+);
+
 /* ── Cap.js captcha storage (proof-of-work; no Redis needed) ──────────── */
 export const capChallenges = sqliteTable("cap_challenges", {
   token: text("token").primaryKey(),
@@ -412,5 +481,7 @@ export type VoiceStatRow = typeof voiceStats.$inferSelect;
 export type SecurityEventRow = typeof securityEvents.$inferSelect;
 export type ErrorEventRow = typeof errorEvents.$inferSelect;
 export type GenerationEventRow = typeof generationEvents.$inferSelect;
+export type TestRunRow = typeof testRuns.$inferSelect;
+export type TestResultRow = typeof testResults.$inferSelect;
 
 export { sql };

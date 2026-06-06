@@ -10,6 +10,18 @@ export async function register() {
   const { startCleanup } = await import("./server/arena/cleanup");
   startCleanup();
 
+  // Resume any "Test All" run interrupted by a restart (drains leftover models).
+  try {
+    const { resumeInterruptedTestRuns } =
+      await import("./server/admin/test-runner");
+    await resumeInterruptedTestRuns();
+  } catch (err) {
+    console.error(
+      "[instrumentation] resume test runs failed (non-fatal):",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
   // Refresh model metadata (name/url/icon) from the live router catalog. This
   // is what makes a provider's logo appear right after deploy — the boot seed
   // only knows about a couple of providers, and otherwise icons only refresh

@@ -5,8 +5,9 @@
  * URLs, never identities.
  */
 import type { ArenaModelDTO, ModelType } from "@ttsa/shared";
+import { and, gt, isNotNull } from "drizzle-orm";
 import { db } from "../db/client";
-import { votes } from "../db/schema";
+import { models, votes } from "../db/schema";
 import { synthesize } from "../router-client";
 import { getCatalog, ensureModelsSeeded } from "./catalog";
 import { createSession, type BattleSession } from "./session-store";
@@ -15,6 +16,20 @@ import { errInfo, logErrorEvent } from "../observability/errors";
 import { logGenerationEvent } from "../observability/generation";
 
 const SMOOTHING = 500;
+
+/** Ids of models currently timed out (timedOutUntil in the future). */
+async function timedOutModelIds(): Promise<Set<string>> {
+  const rows = await db
+    .select({ id: models.id })
+    .from(models)
+    .where(
+      and(
+        isNotNull(models.timedOutUntil),
+        gt(models.timedOutUntil, new Date()),
+      ),
+    );
+  return new Set(rows.map((r) => r.id));
+}
 
 /** Appearance counts per model id (chosen or rejected) for weighted selection. */
 async function appearanceCounts(): Promise<Record<string, number>> {
@@ -64,15 +79,22 @@ export async function generateBattle(params: {
 }): Promise<BattleSession> {
   const { userId, modelType, text, origin } = params;
 
-  const catalog = await getCatalog();
-  if (catalog.length < 2) {
-    throw new Error("Not enough models are available right now");
-  }
+  const fullCatalog = await getCatalog();
 
   // Make sure the catalog models exist in the DB before a vote can FK to them.
   // The router is the catalog's source of truth, but ratings live here, so the
-  // roster can drift from the last seed — sync it now.
-  await ensureModelsSeeded(catalog);
+  // roster can drift from the last seed — sync it now. (Seed the full catalog
+  // so timed-out models keep their rows/metadata.)
+  await ensureModelsSeeded(fullCatalog);
+
+  // Drop models an admin has temporarily timed out (suppressed from battles
+  // until timedOutUntil). This is a web-side admin concept the router doesn't
+  // know about, so we filter the catalog here.
+  const timedOut = await timedOutModelIds();
+  const catalog = fullCatalog.filter((m) => !timedOut.has(m.id));
+  if (catalog.length < 2) {
+    throw new Error("Not enough models are available right now");
+  }
 
   const counts = await appearanceCounts();
 
