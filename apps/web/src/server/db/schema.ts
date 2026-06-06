@@ -289,6 +289,84 @@ export const securityEvents = sqliteTable(
   }),
 );
 
+/* ── Error events (observability — every caught error, persisted) ─────── */
+export const errorEvents = sqliteTable(
+  "error_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Where it happened, e.g. "tts_generate", "router_synth", "api". */
+    source: text("source").notNull(),
+    /** "warn" | "error" | "fatal". */
+    severity: text("severity").notNull().default("error"),
+    message: text("message").notNull(),
+    /** Stack trace (truncated). */
+    stack: text("stack"),
+    /** Request path + method, when in a route. */
+    route: text("route"),
+    method: text("method"),
+    /** Provider/model in play (powers "which models fail most"). */
+    provider: text("provider"),
+    model: text("model"),
+    /** Upstream/HTTP status, when relevant. */
+    status: integer("status"),
+    /** Acting user, when known. */
+    userId: integer("user_id"),
+    /** Free-form JSON context. */
+    detail: text("detail"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(now),
+  },
+  (t) => ({
+    byTime: index("error_events_time_idx").on(t.createdAt),
+    bySource: index("error_events_source_idx").on(t.source),
+    bySeverity: index("error_events_severity_idx").on(t.severity),
+    byModel: index("error_events_model_idx").on(t.model),
+  }),
+);
+
+/* ── Generation events (latency / throughput observability) ──────────── */
+/**
+ * One row per individual model synthesis attempt (each side of a battle is its
+ * own row). This is the granular unit latency lives at: how long a provider
+ * took, whether it succeeded, and how much audio came back — powering per-model
+ * P50/P95 latency, success rate, and throughput trends in the admin panel.
+ */
+export const generationEvents = sqliteTable(
+  "generation_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    provider: text("provider").notNull(),
+    /** Stable arena model id (FK-shaped, not enforced — models may be reseeded). */
+    model: text("model").notNull(),
+    /** The provider-side router model actually invoked. */
+    routerModel: text("router_model"),
+    /** Wall-clock synthesis time in milliseconds. */
+    durationMs: integer("duration_ms").notNull(),
+    /** Did the synth succeed? */
+    success: integer("success", { mode: "boolean" }).notNull(),
+    /** Bytes of audio returned (0 on failure). */
+    audioBytes: integer("audio_bytes").notNull().default(0),
+    /** Input text length (chars) — latency tends to scale with it. */
+    textLength: integer("text_length"),
+    /** Upstream status when the attempt failed via a non-OK response. */
+    status: integer("status"),
+    /** Short failure reason (provider message), when not successful. */
+    error: text("error"),
+    /** Acting user, when known. */
+    userId: integer("user_id"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(now),
+  },
+  (t) => ({
+    byTime: index("generation_events_time_idx").on(t.createdAt),
+    byModel: index("generation_events_model_idx").on(t.model),
+    byProvider: index("generation_events_provider_idx").on(t.provider),
+    bySuccess: index("generation_events_success_idx").on(t.success),
+  }),
+);
+
 /* ── Cap.js captcha storage (proof-of-work; no Redis needed) ──────────── */
 export const capChallenges = sqliteTable("cap_challenges", {
   token: text("token").primaryKey(),
@@ -332,5 +410,7 @@ export type ModelRow = typeof models.$inferSelect;
 export type VoteRow = typeof votes.$inferSelect;
 export type VoiceStatRow = typeof voiceStats.$inferSelect;
 export type SecurityEventRow = typeof securityEvents.$inferSelect;
+export type ErrorEventRow = typeof errorEvents.$inferSelect;
+export type GenerationEventRow = typeof generationEvents.$inferSelect;
 
 export { sql };

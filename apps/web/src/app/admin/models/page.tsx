@@ -13,6 +13,7 @@ import type {
 import type { ColumnDef } from "@tanstack/react-table";
 import { PageHeader } from "@/components/admin/shell";
 import { DataTable, fmtDate } from "@/components/admin/data-table";
+import { ModelLogo } from "@/components/model-logo";
 import { useToast } from "@/components/toast";
 
 async function fetchModels(): Promise<AdminModelsResponse> {
@@ -39,6 +40,7 @@ export default function AdminModelsPage() {
         header: "Model",
         cell: (c) => (
           <div className="flex items-center gap-2">
+            <ModelLogo icon={c.row.original.icon} className="h-7 w-7" />
             <span className="font-medium">{c.row.original.name}</span>
             <span className="tag">{c.row.original.id}</span>
           </div>

@@ -17,6 +17,7 @@ import {
 } from "@ttsa/provider-sdk";
 
 const ENDPOINT = "https://api.gradium.ai/api/post/speech/tts";
+const ICON = "/logos/gradium.webp";
 const VOICES = [
   "6MFfc37kq0sBjBjy",
   "_6Aslh2DxfmnRLmP",
@@ -72,6 +73,7 @@ registerArenaModels([
     id: "gradium",
     name: "Gradium TTS",
     url: "https://gradium.ai/",
+    icon: ICON,
     open: false,
     provider: "gradium",
     routerModel: "gradium",

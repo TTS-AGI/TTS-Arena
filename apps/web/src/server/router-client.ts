@@ -4,6 +4,7 @@
  */
 import { routerTTSResponseSchema } from "@ttsa/shared";
 import { serverEnv } from "./env";
+import { logErrorEvent } from "./observability/errors";
 
 export type Synthesized = {
   /** Normalized audio (for playback). */
@@ -49,6 +50,13 @@ export async function synthesize(params: {
       model: params.model,
       reason,
     });
+    void logErrorEvent({
+      source: "router_synth",
+      message: `Router request failed: ${reason}`,
+      provider: params.provider,
+      model: params.model,
+      detail: { url, kind: "network" },
+    });
     throw new Error(
       `Router request failed for ${params.provider}/${params.model ?? "default"}: ${reason}`,
     );
@@ -62,6 +70,14 @@ export async function synthesize(params: {
       model: params.model,
       status: res.status,
       detail: detail.slice(0, 500),
+    });
+    void logErrorEvent({
+      source: "router_synth",
+      message: `Router ${res.status} for ${params.provider}/${params.model ?? "default"}`,
+      provider: params.provider,
+      model: params.model,
+      status: res.status,
+      detail: { url, body: detail.slice(0, 500) },
     });
     throw new Error(
       `Router ${res.status} for ${params.provider}/${params.model ?? "default"}: ${detail.slice(0, 200)}`,

@@ -1,3 +1,19 @@
+import { HFLogo } from "./hf-logo";
+
+/** X (formerly Twitter) wordmark, inherits currentColor. */
+function XMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      className={className}
+    >
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 const STEPS = [
   { n: "01", t: "Type", d: "Write any line you want to hear spoken aloud." },
   { n: "02", t: "Listen", d: "Two anonymous models — A and B — read it back." },
@@ -54,21 +70,65 @@ const CITATION = `@misc{tts-arena-v2,
   howpublished = {\\url{https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2}}
 }`;
 
-/** People who helped build the arena, with their Hugging Face profiles. */
+/**
+ * People who helped build the arena. Avatars were downloaded once from the
+ * Hugging Face API, optimized, and committed under /public/avatars — they are
+ * not fetched at runtime.
+ */
 const CREDITS = [
-  { name: "Vaibhav Srivastav", hf: "https://huggingface.co/reach-vb" },
-  { name: "Clémentine Fourrier", hf: "https://huggingface.co/clefourrier" },
-  { name: "Lucain Pouget", hf: "https://huggingface.co/Wauplin" },
-  { name: "Yoach Lacombe", hf: "https://huggingface.co/ylacombe" },
-  { name: "main", hf: "https://huggingface.co/main-horse" },
-  { name: "Sanchit Gandhi", hf: "https://huggingface.co/sanchit-gandhi" },
-  { name: "Apolinário Passos", hf: "https://huggingface.co/multimodalart" },
-  { name: "Pedro Cuenca", hf: "https://huggingface.co/pcuenq" },
+  {
+    name: "Vaibhav Srivastav",
+    avatar: "/avatars/reach-vb.webp",
+    hf: "https://huggingface.co/reach-vb",
+    x: "https://x.com/reach_vb",
+  },
+  {
+    name: "Clémentine Fourrier",
+    avatar: "/avatars/clefourrier.webp",
+    hf: "https://huggingface.co/clefourrier",
+    x: "https://x.com/clefourrier",
+  },
+  {
+    name: "Lucain Pouget",
+    avatar: "/avatars/Wauplin.webp",
+    hf: "https://huggingface.co/Wauplin",
+    x: "https://x.com/Wauplin",
+  },
+  {
+    name: "Yoach Lacombe",
+    avatar: "/avatars/ylacombe.webp",
+    hf: "https://huggingface.co/ylacombe",
+    x: "https://x.com/yoachlacombe",
+  },
+  {
+    name: "main",
+    avatar: "/avatars/main-horse.webp",
+    hf: "https://huggingface.co/main-horse",
+    x: "https://x.com/main_horse",
+  },
+  {
+    name: "Sanchit Gandhi",
+    avatar: "/avatars/sanchit-gandhi.webp",
+    hf: "https://huggingface.co/sanchit-gandhi",
+    x: "https://x.com/sanchitgandhi99",
+  },
+  {
+    name: "Apolinário Passos",
+    avatar: "/avatars/multimodalart.webp",
+    hf: "https://huggingface.co/multimodalart",
+    x: "https://x.com/multimodalart",
+  },
+  {
+    name: "Pedro Cuenca",
+    avatar: "/avatars/pcuenq.webp",
+    hf: "https://huggingface.co/pcuenq",
+    x: "https://x.com/pcuenq",
+  },
 ];
 
 const LINKS = [
   { label: "Discord", href: "https://discord.gg/HB8fMR6GTr" },
-  { label: "Twitter", href: "https://x.com/realmrfakename" },
+  { label: "X", href: "https://x.com/realmrfakename" },
   { label: "GitHub", href: "https://github.com/TTS-AGI/TTS-Arena" },
 ];
 
@@ -150,21 +210,50 @@ export function About() {
       {/* Credits */}
       <div className="card p-5">
         <p className="tag mb-3">Credits</p>
-        <p className="mb-3 text-sm text-ink-2">
+        <p className="mb-4 text-sm text-ink-2">
           Built by mrfakename, with thanks to the people who helped make it
           real:
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           {CREDITS.map((c) => (
-            <a
+            <div
               key={c.name}
-              href={c.hf}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full bg-fill px-3 py-1.5 text-sm text-ink-2 transition-colors hover:bg-line hover:text-ink"
+              className="flex items-center gap-3 rounded-xl bg-fill p-2.5"
             >
-              {c.name}
-            </a>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={c.avatar}
+                alt=""
+                aria-hidden
+                width={40}
+                height={40}
+                loading="lazy"
+                className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-black/5"
+              />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {c.name}
+              </span>
+              <span className="flex items-center gap-1">
+                <a
+                  href={c.hf}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${c.name} on Hugging Face`}
+                  className="grid h-7 w-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-line hover:text-ink"
+                >
+                  <HFLogo className="h-4 w-4" />
+                </a>
+                <a
+                  href={c.x}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${c.name} on X`}
+                  className="grid h-7 w-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-line hover:text-ink"
+                >
+                  <XMark className="h-3.5 w-3.5" />
+                </a>
+              </span>
+            </div>
           ))}
         </div>
       </div>

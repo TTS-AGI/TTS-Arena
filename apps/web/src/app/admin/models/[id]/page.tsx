@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { AdminModelDetail, AdminVoteRow } from "@ttsa/shared";
 import type { ColumnDef } from "@tanstack/react-table";
 import { PageHeader, StatCard } from "@/components/admin/shell";
+import { ModelLogo } from "@/components/model-logo";
 import { DataTable, fmtDate, truncate } from "@/components/admin/data-table";
 import {
   BarChartCard,
@@ -42,18 +43,25 @@ export default function AdminModelDetailPage({
 
   return (
     <div>
-      <PageHeader
-        title={data ? data.model.name : "Model"}
-        subtitle={data ? data.model.id : undefined}
-        actions={
-          <Link
-            href="/admin/models"
-            className="flex items-center gap-1.5 rounded-full bg-fill px-3 py-1.5 text-sm font-medium transition-colors hover:bg-line"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden /> All models
-          </Link>
-        }
-      />
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {data && <ModelLogo icon={data.model.icon} className="h-10 w-10" />}
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {data ? data.model.name : "Model"}
+            </h1>
+            {data && (
+              <p className="mt-0.5 text-sm text-ink-3">{data.model.id}</p>
+            )}
+          </div>
+        </div>
+        <Link
+          href="/admin/models"
+          className="flex items-center gap-1.5 rounded-full bg-fill px-3 py-1.5 text-sm font-medium transition-colors hover:bg-line"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden /> All models
+        </Link>
+      </div>
 
       {isLoading || !data ? (
         <p className="text-sm text-ink-3">Loading…</p>

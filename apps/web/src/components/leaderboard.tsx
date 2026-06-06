@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LeaderboardResponse, LeaderboardRow } from "@ttsa/shared";
+import { ModelLogo } from "./model-logo";
 
 type SortKey = "elo" | "winRate" | "totalVotes";
 const SORTS: { key: SortKey; label: string }[] = [
@@ -164,29 +165,4 @@ function Row({
       </div>
     </div>
   );
-}
-
-/**
- * Provider logo on the leaderboard. Rendered on a white rounded tile so logos
- * with black artwork (or transparent backgrounds) stay legible in both themes.
- * When there's no icon (or it fails to load), render a blank tile — no monogram
- * letter — to keep the name column aligned.
- */
-function ModelLogo({ icon }: { icon: string | null }) {
-  const [broken, setBroken] = useState(false);
-  if (icon && !broken) {
-    return (
-      <span className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden rounded-md bg-white p-0.5 ring-1 ring-black/5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={icon}
-          alt=""
-          aria-hidden
-          onError={() => setBroken(true)}
-          className="h-full w-full object-contain"
-        />
-      </span>
-    );
-  }
-  return <span aria-hidden className="h-6 w-6 shrink-0 rounded-md bg-fill" />;
 }

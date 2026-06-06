@@ -16,6 +16,7 @@ import {
 } from "@ttsa/provider-sdk";
 
 const ENDPOINT = "https://mars-hf-leaderboard.camb.ai/predict";
+const ICON = "/logos/camb.webp";
 
 function key() {
   return env("MARS_API_KEY");
@@ -63,6 +64,7 @@ registerArenaModels([
     id: "mars",
     name: "MARS",
     url: "https://camb.ai/",
+    icon: ICON,
     open: false,
     provider: "mars",
     routerModel: "mars",

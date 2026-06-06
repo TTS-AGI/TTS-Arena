@@ -16,6 +16,7 @@ import { SECURITY } from "../arena/security";
 import { logSecurityEvent } from "./events";
 import { recomputeFromCleanVotes } from "../db/recompute-ratings";
 import { invalidateBTCache } from "../arena/bt-cache";
+import { errInfo, logErrorEvent } from "../observability/errors";
 
 /** Tunables specific to the sweep (cross-entity analysis). */
 const SWEEP = {
@@ -303,10 +304,13 @@ export async function runSecuritySweep(): Promise<void> {
     // Log the message as a plain string — passing the raw error object made
     // Bun's console formatter throw ("custom formatter threw an exception"),
     // which hid the real cause (e.g. a missing column before migration).
-    console.error(
-      "[security] sweep failed:",
-      err instanceof Error ? (err.stack ?? err.message) : String(err),
-    );
+    const info = errInfo(err);
+    console.error("[security] sweep failed:", info.stack ?? info.message);
+    void logErrorEvent({
+      source: "security_sweep",
+      message: info.message,
+      stack: info.stack,
+    });
   } finally {
     running = false;
   }

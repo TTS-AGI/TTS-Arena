@@ -1,0 +1,16 @@
+# build output & deps
+node_modules
+.next
+out
+build
+dist
+
+# generated
+next-env.d.ts
+*.tsbuildinfo
+
+# drizzle generated migrations + snapshots
+drizzle
+
+# assets we don't want reformatted
+public

@@ -11,6 +11,8 @@ import { synthesize } from "../router-client";
 import { getCatalog, ensureModelsSeeded } from "./catalog";
 import { createSession, type BattleSession } from "./session-store";
 import { hashSentence } from "./sentences";
+import { errInfo, logErrorEvent } from "../observability/errors";
+import { logGenerationEvent } from "../observability/generation";
 
 const SMOOTHING = 500;
 
@@ -75,8 +77,10 @@ export async function generateBattle(params: {
   const counts = await appearanceCounts();
 
   // Synthesize a single model, tagging failures with which model failed so we
-  // can drop it and retry with another.
+  // can drop it and retry with another. Each attempt is timed and recorded for
+  // latency/throughput observability (success and failure alike).
   const synthOne = async (m: ArenaModelDTO) => {
+    const start = Date.now();
     try {
       const out = await synthesize({
         text,
@@ -84,8 +88,28 @@ export async function generateBattle(params: {
         model: m.routerModel,
         includeRaw: true,
       });
+      void logGenerationEvent({
+        provider: m.provider,
+        model: m.id,
+        routerModel: m.routerModel,
+        durationMs: Date.now() - start,
+        success: true,
+        audioBytes: out.audio.length,
+        textLength: text.length,
+        userId,
+      });
       return { model: m, synth: out };
     } catch (err) {
+      void logGenerationEvent({
+        provider: m.provider,
+        model: m.id,
+        routerModel: m.routerModel,
+        durationMs: Date.now() - start,
+        success: false,
+        textLength: text.length,
+        error: errInfo(err).message,
+        userId,
+      });
       throw new ModelSynthError(m, err);
     }
   };
@@ -108,13 +132,20 @@ export async function generateBattle(params: {
       if (r.status === "rejected" && r.reason instanceof ModelSynthError) {
         broken.add(r.reason.model.id);
         lastErr = r.reason.failure;
+        const info = errInfo(r.reason.failure);
         console.error("[generate] model synthesis failed, will retry", {
           modelId: r.reason.model.id,
           provider: r.reason.model.provider,
-          error:
-            r.reason.failure instanceof Error
-              ? r.reason.failure.message
-              : String(r.reason.failure),
+          error: info.message,
+        });
+        void logErrorEvent({
+          source: "model_synth",
+          message: info.message,
+          stack: info.stack,
+          provider: r.reason.model.provider,
+          model: r.reason.model.id,
+          userId,
+          detail: { routerModel: r.reason.model.routerModel },
         });
       }
     }

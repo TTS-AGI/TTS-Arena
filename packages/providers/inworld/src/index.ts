@@ -18,6 +18,7 @@ import {
 
 const ENDPOINT = "https://api.inworld.ai/tts/v1/voice";
 const DEFAULT_MODEL = "inworld-tts-1";
+const ICON = "/logos/inworld.webp";
 const VOICES = [
   "Alex",
   "Olivia",
@@ -96,6 +97,7 @@ registerArenaModels([
     id: "inworld",
     name: "Inworld TTS",
     url: "https://inworld.ai/tts",
+    icon: ICON,
     open: false,
     provider: "inworld",
     routerModel: "inworld-tts-1",
@@ -105,6 +107,7 @@ registerArenaModels([
     id: "inworld-max",
     name: "Inworld TTS MAX",
     url: "https://inworld.ai/tts",
+    icon: ICON,
     open: false,
     provider: "inworld",
     routerModel: "inworld-tts-1-max",
@@ -114,6 +117,7 @@ registerArenaModels([
     id: "inworld-max-1.5",
     name: "Inworld TTS 1.5 MAX",
     url: "https://inworld.ai/tts",
+    icon: ICON,
     open: false,
     provider: "inworld",
     routerModel: "inworld-tts-1.5-max",

@@ -272,3 +272,133 @@ export const adminSecurityEventsResponseSchema = z.object({
 export type AdminSecurityEventsResponse = z.infer<
   typeof adminSecurityEventsResponseSchema
 >;
+
+/* ── Errors (observability) ───────────────────────────────────────────── */
+
+export const adminErrorRowSchema = z.object({
+  id: z.number().int(),
+  createdAt: z.number().int(),
+  source: z.string(),
+  severity: z.string(),
+  message: z.string(),
+  stack: z.string().nullable(),
+  route: z.string().nullable(),
+  method: z.string().nullable(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  status: z.number().int().nullable(),
+  userId: z.number().int().nullable(),
+  detail: z.string().nullable(),
+});
+export type AdminErrorRow = z.infer<typeof adminErrorRowSchema>;
+
+export const adminErrorsResponseSchema = z.object({
+  rows: z.array(adminErrorRowSchema),
+  total: z.number().int(),
+});
+export type AdminErrorsResponse = z.infer<typeof adminErrorsResponseSchema>;
+
+/** One day of error counts, split by source (for the stacked trend chart). */
+export const adminErrorDaySchema = z.object({
+  date: z.string(),
+  /** Total across all sources for the day. */
+  count: z.number().int(),
+  /** Per-source counts; keys are source names present that day. */
+  bySource: z.record(z.string(), z.number().int()),
+});
+export type AdminErrorDay = z.infer<typeof adminErrorDaySchema>;
+
+export const adminErrorOverviewSchema = z.object({
+  last24h: z.number().int(),
+  last7d: z.number().int(),
+  total: z.number().int(),
+  distinctSources: z.number().int(),
+  /** Highest-volume failing model in the last 7d (null if none). */
+  topFailingModel: z
+    .object({ model: z.string(), count: z.number().int() })
+    .nullable(),
+  /** Source names that appear in errorsByDay (chart series + legend). */
+  sources: z.array(z.string()),
+  /** Errors per day for the last 30d, oldest first, stacked by source. */
+  errorsByDay: z.array(adminErrorDaySchema),
+  /** Failures grouped by source, last 7d. */
+  bySource: z.array(z.object({ source: z.string(), count: z.number().int() })),
+  /** Failures grouped by model, last 7d (top by count). */
+  byModel: z.array(z.object({ model: z.string(), count: z.number().int() })),
+  /** Failures grouped by provider, last 7d. */
+  byProvider: z.array(
+    z.object({ provider: z.string(), count: z.number().int() }),
+  ),
+  recent: z.array(adminErrorRowSchema),
+});
+export type AdminErrorOverview = z.infer<typeof adminErrorOverviewSchema>;
+
+/* ── Generations (latency / throughput observability) ─────────────────── */
+
+/** Per-model latency + reliability summary over a window. */
+export const adminGenModelStatSchema = z.object({
+  model: z.string(),
+  provider: z.string(),
+  total: z.number().int(),
+  failures: z.number().int(),
+  successRate: z.number(), // 0..100
+  p50: z.number().int(), // ms
+  p95: z.number().int(), // ms
+  avg: z.number().int(), // ms
+});
+export type AdminGenModelStat = z.infer<typeof adminGenModelStatSchema>;
+
+/** One day of generation throughput + latency. */
+export const adminGenDaySchema = z.object({
+  date: z.string(),
+  total: z.number().int(),
+  failures: z.number().int(),
+  /** Median latency that day (ms). */
+  p50: z.number().int(),
+  /** 95th-percentile latency that day (ms). */
+  p95: z.number().int(),
+});
+export type AdminGenDay = z.infer<typeof adminGenDaySchema>;
+
+export const adminGenerationRowSchema = z.object({
+  id: z.number().int(),
+  createdAt: z.number().int(),
+  provider: z.string(),
+  model: z.string(),
+  routerModel: z.string().nullable(),
+  durationMs: z.number().int(),
+  success: z.boolean(),
+  audioBytes: z.number().int(),
+  textLength: z.number().int().nullable(),
+  status: z.number().int().nullable(),
+  error: z.string().nullable(),
+  userId: z.number().int().nullable(),
+});
+export type AdminGenerationRow = z.infer<typeof adminGenerationRowSchema>;
+
+export const adminGenerationsResponseSchema = z.object({
+  rows: z.array(adminGenerationRowSchema),
+  total: z.number().int(),
+});
+export type AdminGenerationsResponse = z.infer<
+  typeof adminGenerationsResponseSchema
+>;
+
+export const adminGenerationOverviewSchema = z.object({
+  last24h: z.number().int(),
+  last7d: z.number().int(),
+  /** Overall success rate over the last 7d (0..100). */
+  successRate7d: z.number(),
+  /** Overall P50 / P95 latency over the last 7d (ms). */
+  p50: z.number().int(),
+  p95: z.number().int(),
+  /** Throughput + latency per day for the last 30d, oldest first. */
+  byDay: z.array(adminGenDaySchema),
+  /** Per-model latency + reliability over the last 7d (sorted slowest first). */
+  byModel: z.array(adminGenModelStatSchema),
+  /** Recent failed generations. */
+  recentFailures: z.array(adminGenerationRowSchema),
+});
+export type AdminGenerationOverview = z.infer<
+  typeof adminGenerationOverviewSchema
+>;

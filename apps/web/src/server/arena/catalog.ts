@@ -7,6 +7,7 @@ import { routerModelsResponseSchema, type ArenaModelDTO } from "@ttsa/shared";
 import { serverEnv } from "../env";
 import { db, withWriteRetry } from "../db/client";
 import { models as modelsTable } from "../db/schema";
+import { logErrorEvent } from "../observability/errors";
 
 const TTL_MS = 30_000;
 let cache: { at: number; models: ArenaModelDTO[] } | null = null;
@@ -26,12 +27,23 @@ export async function getCatalog(): Promise<ArenaModelDTO[]> {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error("[catalog] router /models unreachable", { url, reason });
+    void logErrorEvent({
+      source: "catalog",
+      message: `router /models unreachable: ${reason}`,
+      detail: { url, kind: "network" },
+    });
     throw new Error(`Router /models unreachable: ${reason}`);
   }
   if (!res.ok) {
     console.error("[catalog] router /models non-OK", {
       url,
       status: res.status,
+    });
+    void logErrorEvent({
+      source: "catalog",
+      message: `router /models ${res.status}`,
+      status: res.status,
+      detail: { url },
     });
     throw new Error(`Router /models ${res.status}`);
   }

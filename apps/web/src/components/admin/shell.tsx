@@ -16,6 +16,8 @@ const NAV = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/votes", label: "Votes" },
   { href: "/admin/security", label: "Security" },
+  { href: "/admin/errors", label: "Errors" },
+  { href: "/admin/generations", label: "Generations" },
   { href: "/admin/analytics", label: "Analytics" },
 ];
 
@@ -144,14 +146,17 @@ export function PageHeader({
 export function StatCard({
   label,
   value,
+  hint,
 }: {
   label: string;
   value: React.ReactNode;
+  hint?: string;
 }) {
   return (
     <div className="card p-4">
       <p className="tag">{label}</p>
       <p className="nums mt-1 text-2xl font-semibold">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-ink-3">{hint}</p>}
     </div>
   );
 }

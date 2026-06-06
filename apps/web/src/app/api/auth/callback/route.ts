@@ -18,6 +18,7 @@ import { upsertUser } from "@/server/auth/user";
 import { createSession } from "@/server/auth/session";
 import { recordLogin } from "@/server/auth/logins";
 import { clientIp, userAgent } from "@/server/request-info";
+import { errInfo, logErrorEvent } from "@/server/observability/errors";
 
 function home(reason?: string): NextResponse {
   const url = new URL(serverEnv.appUrl);
@@ -63,7 +64,15 @@ export async function GET(req: NextRequest) {
       fingerprint: null,
     });
     return home();
-  } catch {
+  } catch (err) {
+    const info = errInfo(err);
+    void logErrorEvent({
+      source: "auth_callback",
+      message: info.message,
+      stack: info.stack,
+      route: "/api/auth/callback",
+      method: "GET",
+    });
     return home("error");
   }
 }

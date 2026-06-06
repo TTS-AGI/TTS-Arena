@@ -19,6 +19,7 @@ import {
 const BASE = "https://api.cartesia.ai";
 const VERSION = "2024-11-13";
 const DEFAULT_MODEL = "sonic-2";
+const ICON = "/logos/cartesia.webp";
 
 type Voice = { id: string; name?: string };
 let voices: Voice[] | null = null;
@@ -109,6 +110,7 @@ registerArenaModels([
     id: "cartesia-sonic-2",
     name: "Cartesia Sonic 2",
     url: "https://cartesia.ai/",
+    icon: ICON,
     open: false,
     provider: "cartesia",
     routerModel: "sonic-2",

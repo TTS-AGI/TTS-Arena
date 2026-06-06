@@ -15,6 +15,7 @@ import {
 import { currentUser } from "@/server/auth/user";
 import { generateBattle } from "@/server/arena/generate";
 import { isEnglish } from "@/server/arena/sentences";
+import { errInfo, logErrorEvent } from "@/server/observability/errors";
 
 export async function POST(req: Request) {
   const user = await currentUser();
@@ -58,10 +59,20 @@ export async function POST(req: Request) {
   } catch (err) {
     // Log the full error server-side — this is the only place the real cause
     // (router status, provider failure, timeout, …) is visible.
+    const info = errInfo(err);
     console.error("[tts/generate] failed", {
       userId: user.id,
       textLength: text.length,
-      error: err instanceof Error ? (err.stack ?? err.message) : String(err),
+      error: info.stack ?? info.message,
+    });
+    void logErrorEvent({
+      source: "tts_generate",
+      message: info.message,
+      stack: info.stack,
+      route: "/api/tts/generate",
+      method: "POST",
+      userId: user.id,
+      detail: { textLength: text.length, origin },
     });
     return NextResponse.json(
       {

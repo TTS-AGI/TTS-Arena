@@ -7,6 +7,11 @@
 import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 import type {
   AdminAnalytics,
+  AdminErrorOverview,
+  AdminErrorRow,
+  AdminGenerationOverview,
+  AdminGenerationRow,
+  AdminGenModelStat,
   AdminModel,
   AdminOverview,
   AdminSecurityEvent,
@@ -18,6 +23,8 @@ import type {
 import type { AdminModelDetail } from "@ttsa/shared";
 import { db, withWriteRetry } from "../db/client";
 import {
+  errorEvents,
+  generationEvents,
   models,
   ratingHistory,
   securityEvents,
@@ -650,6 +657,17 @@ export async function securityOverview(): Promise<AdminSecurityOverview> {
     .having(sql`count(distinct ${userLogins.userId}) >= 2`)
     .orderBy(sql`count(distinct ${userLogins.userId}) desc`)
     .limit(10);
+  const riskIpEvents = await db
+    .select({
+      ip: securityEvents.ip,
+      events: sql<number>`count(*)`,
+    })
+    .from(securityEvents)
+    .where(sql`${securityEvents.ip} is not null`)
+    .groupBy(securityEvents.ip);
+  const riskIpEventMap = new Map(
+    riskIpEvents.map((r) => [r.ip as string, r.events]),
+  );
 
   const recentEventRows = await db
     .select({
@@ -690,7 +708,11 @@ export async function securityOverview(): Promise<AdminSecurityOverview> {
     })),
     topRiskyIps: ipRows
       .filter((r) => r.ip)
-      .map((r) => ({ ip: r.ip as string, accounts: r.accounts, events: 0 })),
+      .map((r) => ({
+        ip: r.ip as string,
+        accounts: r.accounts,
+        events: riskIpEventMap.get(r.ip as string) ?? 0,
+      })),
     recentEvents: recentEventRows.map(eventRow),
     quarantined: quarantinedRows.map((q) => ({
       id: q.id,
@@ -757,6 +779,359 @@ export async function setVoteFlag(
   await recomputeFromCleanVotes();
   invalidateBTCache();
   return true;
+}
+
+/* ── Errors (observability) ───────────────────────────────────────────── */
+
+function errorRow(r: {
+  id: number;
+  createdAt: Date;
+  source: string;
+  severity: string;
+  message: string;
+  stack: string | null;
+  route: string | null;
+  method: string | null;
+  provider: string | null;
+  model: string | null;
+  status: number | null;
+  userId: number | null;
+  detail: string | null;
+}): AdminErrorRow {
+  return {
+    id: r.id,
+    createdAt: epoch(r.createdAt),
+    source: r.source,
+    severity: r.severity,
+    message: r.message,
+    stack: r.stack,
+    route: r.route,
+    method: r.method,
+    provider: r.provider,
+    model: r.model,
+    status: r.status,
+    userId: r.userId,
+    detail: r.detail,
+  };
+}
+
+export async function errorOverview(): Promise<AdminErrorOverview> {
+  const [last24h, last7d, total, distinctSources] = await Promise.all([
+    db
+      .select({ c: sql<number>`count(*)` })
+      .from(errorEvents)
+      .where(sql`${errorEvents.createdAt} >= unixepoch('now', '-1 day')`),
+    db
+      .select({ c: sql<number>`count(*)` })
+      .from(errorEvents)
+      .where(sql`${errorEvents.createdAt} >= unixepoch('now', '-7 days')`),
+    db.select({ c: sql<number>`count(*)` }).from(errorEvents),
+    db
+      .select({
+        c: sql<number>`count(distinct ${errorEvents.source})`,
+      })
+      .from(errorEvents),
+  ]);
+
+  // Errors per day for the last 30d, split by source.
+  const dayRows = await db
+    .select({
+      day: sql<string>`date(${errorEvents.createdAt}, 'unixepoch')`,
+      source: errorEvents.source,
+      c: sql<number>`count(*)`,
+    })
+    .from(errorEvents)
+    .where(sql`${errorEvents.createdAt} >= unixepoch('now', '-30 days')`)
+    .groupBy(
+      sql`date(${errorEvents.createdAt}, 'unixepoch')`,
+      errorEvents.source,
+    );
+
+  const sourceSet = new Set<string>();
+  const byDayMap = new Map<string, Record<string, number>>();
+  for (const r of dayRows) {
+    sourceSet.add(r.source);
+    const entry = byDayMap.get(r.day) ?? {};
+    entry[r.source] = (entry[r.source] ?? 0) + r.c;
+    byDayMap.set(r.day, entry);
+  }
+  const sources = [...sourceSet].sort();
+  const errorsByDay: AdminErrorOverview["errorsByDay"] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400_000).toISOString().slice(0, 10);
+    const bySource = byDayMap.get(d) ?? {};
+    const count = Object.values(bySource).reduce((s, n) => s + n, 0);
+    errorsByDay.push({ date: d, count, bySource });
+  }
+
+  // Last-7d breakdowns by source / model / provider.
+  const week = sql`${errorEvents.createdAt} >= unixepoch('now', '-7 days')`;
+  const [bySourceRows, byModelRows, byProviderRows] = await Promise.all([
+    db
+      .select({ source: errorEvents.source, c: sql<number>`count(*)` })
+      .from(errorEvents)
+      .where(week)
+      .groupBy(errorEvents.source)
+      .orderBy(sql`count(*) desc`),
+    db
+      .select({ model: errorEvents.model, c: sql<number>`count(*)` })
+      .from(errorEvents)
+      .where(and(week, sql`${errorEvents.model} is not null`))
+      .groupBy(errorEvents.model)
+      .orderBy(sql`count(*) desc`)
+      .limit(15),
+    db
+      .select({ provider: errorEvents.provider, c: sql<number>`count(*)` })
+      .from(errorEvents)
+      .where(and(week, sql`${errorEvents.provider} is not null`))
+      .groupBy(errorEvents.provider)
+      .orderBy(sql`count(*) desc`)
+      .limit(15),
+  ]);
+
+  const byModel = byModelRows
+    .filter((r) => r.model)
+    .map((r) => ({ model: r.model as string, count: r.c }));
+  const topFailingModel = byModel.length
+    ? { model: byModel[0]!.model, count: byModel[0]!.count }
+    : null;
+
+  const recentRows = await db
+    .select()
+    .from(errorEvents)
+    .orderBy(desc(errorEvents.createdAt))
+    .limit(20);
+
+  return {
+    last24h: countRows(last24h),
+    last7d: countRows(last7d),
+    total: countRows(total),
+    distinctSources: countRows(distinctSources),
+    topFailingModel,
+    sources,
+    errorsByDay,
+    bySource: bySourceRows.map((r) => ({ source: r.source, count: r.c })),
+    byModel,
+    byProvider: byProviderRows
+      .filter((r) => r.provider)
+      .map((r) => ({ provider: r.provider as string, count: r.c })),
+    recent: recentRows.map(errorRow),
+  };
+}
+
+export async function listErrors(opts: {
+  page: number;
+  pageSize: number;
+  source?: string;
+  severity?: string;
+  model?: string;
+  search?: string;
+}): Promise<{ rows: AdminErrorRow[]; total: number }> {
+  const { page, pageSize, source, severity, model, search } = opts;
+  const conds = [];
+  if (source) conds.push(eq(errorEvents.source, source));
+  if (severity) conds.push(eq(errorEvents.severity, severity));
+  if (model) conds.push(eq(errorEvents.model, model));
+  if (search) conds.push(like(errorEvents.message, `%${search}%`));
+  const where = conds.length ? and(...conds) : undefined;
+
+  const totalRows = await db
+    .select({ c: sql<number>`count(*)` })
+    .from(errorEvents)
+    .where(where);
+
+  const rows = await db
+    .select()
+    .from(errorEvents)
+    .where(where)
+    .orderBy(desc(errorEvents.createdAt))
+    .limit(pageSize)
+    .offset(page * pageSize);
+
+  return { total: countRows(totalRows), rows: rows.map(errorRow) };
+}
+
+/* ── Generations (latency / throughput observability) ─────────────────── */
+
+/** Percentile (0..1) of a numeric array via nearest-rank. Returns 0 if empty. */
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.ceil(p * sorted.length) - 1),
+  );
+  return sorted[idx]!;
+}
+
+function genRow(r: {
+  id: number;
+  createdAt: Date;
+  provider: string;
+  model: string;
+  routerModel: string | null;
+  durationMs: number;
+  success: boolean;
+  audioBytes: number;
+  textLength: number | null;
+  status: number | null;
+  error: string | null;
+  userId: number | null;
+}): AdminGenerationRow {
+  return {
+    id: r.id,
+    createdAt: epoch(r.createdAt),
+    provider: r.provider,
+    model: r.model,
+    routerModel: r.routerModel,
+    durationMs: r.durationMs,
+    success: r.success,
+    audioBytes: r.audioBytes,
+    textLength: r.textLength,
+    status: r.status,
+    error: r.error,
+    userId: r.userId,
+  };
+}
+
+export async function generationOverview(): Promise<AdminGenerationOverview> {
+  const [c24, c7] = await Promise.all([
+    db
+      .select({ c: sql<number>`count(*)` })
+      .from(generationEvents)
+      .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-1 day')`),
+    db
+      .select({ c: sql<number>`count(*)` })
+      .from(generationEvents)
+      .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-7 days')`),
+  ]);
+
+  // Pull raw 7d rows for percentile math (percentiles aren't native in SQLite).
+  const week7 = await db
+    .select({
+      day: sql<string>`date(${generationEvents.createdAt}, 'unixepoch')`,
+      durationMs: generationEvents.durationMs,
+      success: generationEvents.success,
+      provider: generationEvents.provider,
+      model: generationEvents.model,
+    })
+    .from(generationEvents)
+    .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-7 days')`);
+
+  const all7 = week7.map((r) => r.durationMs).sort((a, b) => a - b);
+  const success7 = week7.filter((r) => r.success).length;
+
+  // Per-model 7d latency + reliability.
+  type Acc = { provider: string; durs: number[]; failures: number };
+  const perModel = new Map<string, Acc>();
+  for (const r of week7) {
+    let acc = perModel.get(r.model);
+    if (!acc) {
+      acc = { provider: r.provider, durs: [], failures: 0 };
+      perModel.set(r.model, acc);
+    }
+    acc.durs.push(r.durationMs);
+    if (!r.success) acc.failures += 1;
+  }
+  const byModel: AdminGenModelStat[] = [...perModel.entries()]
+    .map(([model, acc]) => {
+      const sorted = [...acc.durs].sort((a, b) => a - b);
+      const total = sorted.length;
+      const avg = total
+        ? Math.round(sorted.reduce((s, n) => s + n, 0) / total)
+        : 0;
+      return {
+        model,
+        provider: acc.provider,
+        total,
+        failures: acc.failures,
+        successRate: total ? ((total - acc.failures) / total) * 100 : 0,
+        p50: percentile(sorted, 0.5),
+        p95: percentile(sorted, 0.95),
+        avg,
+      };
+    })
+    .sort((a, b) => b.p95 - a.p95);
+
+  // Per-day throughput + latency over 30d (raw rows, bucketed in JS).
+  const month = await db
+    .select({
+      day: sql<string>`date(${generationEvents.createdAt}, 'unixepoch')`,
+      durationMs: generationEvents.durationMs,
+      success: generationEvents.success,
+    })
+    .from(generationEvents)
+    .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-30 days')`);
+  const dayMap = new Map<string, { durs: number[]; failures: number }>();
+  for (const r of month) {
+    let e = dayMap.get(r.day);
+    if (!e) {
+      e = { durs: [], failures: 0 };
+      dayMap.set(r.day, e);
+    }
+    e.durs.push(r.durationMs);
+    if (!r.success) e.failures += 1;
+  }
+  const byDay: AdminGenerationOverview["byDay"] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400_000).toISOString().slice(0, 10);
+    const e = dayMap.get(d);
+    const sorted = e ? [...e.durs].sort((a, b) => a - b) : [];
+    byDay.push({
+      date: d,
+      total: sorted.length,
+      failures: e?.failures ?? 0,
+      p50: percentile(sorted, 0.5),
+      p95: percentile(sorted, 0.95),
+    });
+  }
+
+  const recentFailRows = await db
+    .select()
+    .from(generationEvents)
+    .where(eq(generationEvents.success, false))
+    .orderBy(desc(generationEvents.createdAt))
+    .limit(20);
+
+  return {
+    last24h: countRows(c24),
+    last7d: countRows(c7),
+    successRate7d: week7.length ? (success7 / week7.length) * 100 : 0,
+    p50: percentile(all7, 0.5),
+    p95: percentile(all7, 0.95),
+    byDay,
+    byModel,
+    recentFailures: recentFailRows.map(genRow),
+  };
+}
+
+export async function listGenerations(opts: {
+  page: number;
+  pageSize: number;
+  model?: string;
+  provider?: string;
+  failedOnly?: boolean;
+}): Promise<{ rows: AdminGenerationRow[]; total: number }> {
+  const { page, pageSize, model, provider, failedOnly } = opts;
+  const conds = [];
+  if (model) conds.push(eq(generationEvents.model, model));
+  if (provider) conds.push(eq(generationEvents.provider, provider));
+  if (failedOnly) conds.push(eq(generationEvents.success, false));
+  const where = conds.length ? and(...conds) : undefined;
+
+  const totalRows = await db
+    .select({ c: sql<number>`count(*)` })
+    .from(generationEvents)
+    .where(where);
+
+  const rows = await db
+    .select()
+    .from(generationEvents)
+    .where(where)
+    .orderBy(desc(generationEvents.createdAt))
+    .limit(pageSize)
+    .offset(page * pageSize);
+
+  return { total: countRows(totalRows), rows: rows.map(genRow) };
 }
 
 /** Quarantine/un-quarantine a user, then recompute ratings. */

@@ -16,6 +16,7 @@ import { recordVote } from "@/server/arena/vote";
 import { assessVote, SECURITY } from "@/server/arena/security";
 import { latestFingerprint } from "@/server/auth/logins";
 import { verifyCapToken } from "@/server/security/cap";
+import { errInfo, logErrorEvent } from "@/server/observability/errors";
 import { db } from "@/server/db/client";
 import { models } from "@/server/db/schema";
 
@@ -122,19 +123,40 @@ export async function POST(req: Request) {
     // recorded, so a cleanup failure must NOT fail the request (the periodic
     // sweep will reclaim it). This was silently 500ing votes.
     deleteSession(session.id).catch((err) => {
+      const info = errInfo(err);
       console.error("[tts/vote] session cleanup failed (non-fatal)", {
         sessionId: session.id,
-        error: err instanceof Error ? err.message : String(err),
+        error: info.message,
+      });
+      void logErrorEvent({
+        source: "tts_vote",
+        severity: "warn",
+        message: `session cleanup failed: ${info.message}`,
+        stack: info.stack,
+        route: "/api/tts/vote",
+        method: "POST",
+        userId: user.id,
+        detail: { sessionId: session.id },
       });
     });
 
     return NextResponse.json(body);
   } catch (err) {
+    const info = errInfo(err);
     console.error("[tts/vote] failed", {
       sessionId: session.id,
       userId: user.id,
       chosen,
-      error: err instanceof Error ? (err.stack ?? err.message) : String(err),
+      error: info.stack ?? info.message,
+    });
+    void logErrorEvent({
+      source: "tts_vote",
+      message: info.message,
+      stack: info.stack,
+      route: "/api/tts/vote",
+      method: "POST",
+      userId: user.id,
+      detail: { sessionId: session.id, chosen },
     });
     return NextResponse.json(
       {

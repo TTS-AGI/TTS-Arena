@@ -16,6 +16,7 @@ import {
 } from "@ttsa/provider-sdk";
 
 const ENDPOINT = "https://p.cluster.resemble.ai/synthesize";
+const ICON = "/logos/chatterbox.webp";
 const VOICES = ["4e228dba", "01bcc102", "ecbe5d97", "ae8223ca"];
 
 function key() {
@@ -83,6 +84,7 @@ registerArenaModels([
     id: "chatterbox",
     name: "Chatterbox",
     url: "https://www.resemble.ai/chatterbox/",
+    icon: ICON,
     open: false,
     provider: "chatterbox",
     routerModel: "chatterbox",

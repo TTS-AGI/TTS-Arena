@@ -1,0 +1,27 @@
+/** GET /api/admin/generations?page&pageSize&model&provider&failed — paginated log. Admin only. */
+import { NextResponse, type NextRequest } from "next/server";
+import type { AdminGenerationsResponse } from "@ttsa/shared";
+import { requireAdmin } from "@/server/auth/admin";
+import { listGenerations } from "@/server/admin/queries";
+
+export async function GET(req: NextRequest) {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    return NextResponse.json({ error: "forbidden" }, { status: guard.status });
+  }
+  const sp = req.nextUrl.searchParams;
+  const page = Math.max(0, Number(sp.get("page") ?? 0) || 0);
+  const pageSize = Math.min(100, Math.max(1, Number(sp.get("pageSize") ?? 50)));
+  const model = sp.get("model")?.trim() || undefined;
+  const provider = sp.get("provider")?.trim() || undefined;
+  const failedOnly = sp.get("failed") === "1";
+
+  const body: AdminGenerationsResponse = await listGenerations({
+    page,
+    pageSize,
+    model,
+    provider,
+    failedOnly,
+  });
+  return NextResponse.json(body);
+}

@@ -18,6 +18,7 @@ import {
 
 const ENDPOINT = "https://api.typecast.ai/v1/text-to-speech";
 const MODEL_NAME = "ssfm-v30";
+const ICON = "/logos/typecast.webp";
 const VOICES = [
   "tc_65b34b05b3fb844f3d6b7aab",
   "tc_67b6985d4d5d632d97478263",
@@ -82,6 +83,7 @@ registerArenaModels([
     id: "typecast",
     name: "Typecast SSFM 3.0",
     url: "https://typecast.ai/developers/",
+    icon: ICON,
     open: false,
     provider: "typecast",
     routerModel: "typecast",

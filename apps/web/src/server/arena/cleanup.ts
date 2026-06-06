@@ -5,6 +5,12 @@
  */
 import { sweepExpired } from "./session-store";
 import { runSecuritySweep } from "../security/sweep";
+import {
+  errInfo,
+  logErrorEvent,
+  pruneErrorEvents,
+} from "../observability/errors";
+import { pruneGenerationEvents } from "../observability/generation";
 
 const INTERVAL_MS = 5 * 60 * 1000;
 /** Security sweep runs less often (cross-entity analysis is heavier). */
@@ -23,8 +29,17 @@ export function startCleanup(): void {
       if (removed > 0) {
         console.info(`[cleanup] removed ${removed} expired battle session(s)`);
       }
+      // Prune old observability rows on the same cadence (best-effort).
+      await pruneErrorEvents();
+      await pruneGenerationEvents();
     } catch (err) {
-      console.error("[cleanup] sweep failed:", err);
+      const info = errInfo(err);
+      console.error("[cleanup] sweep failed:", info.message);
+      void logErrorEvent({
+        source: "cleanup",
+        message: info.message,
+        stack: info.stack,
+      });
     }
   };
 
@@ -32,7 +47,13 @@ export function startCleanup(): void {
     try {
       await runSecuritySweep();
     } catch (err) {
-      console.error("[cleanup] security sweep failed:", err);
+      const info = errInfo(err);
+      console.error("[cleanup] security sweep failed:", info.message);
+      void logErrorEvent({
+        source: "security_sweep",
+        message: info.message,
+        stack: info.stack,
+      });
     }
   };
 

@@ -17,6 +17,7 @@ import {
 } from "@ttsa/provider-sdk";
 
 const ENDPOINT = "https://api.hume.ai/v0/tts/file";
+const ICON = "/logos/hume.webp";
 const VOICES = [
   "Male English Actor",
   "Female English Actor",
@@ -76,6 +77,7 @@ registerArenaModels([
     id: "hume-octave",
     name: "Hume Octave",
     url: "https://hume.ai/",
+    icon: ICON,
     open: false,
     provider: "hume",
     routerModel: "octave",
