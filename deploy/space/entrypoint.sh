@@ -10,10 +10,38 @@ set -euo pipefail
 # Persistent buckets: /data holds the DB, /audio holds logged generations.
 mkdir -p /data /audio
 
-# DB lives on the persistent bucket. WAL sidecar files (-wal, -shm) live next to
-# it; they're checkpointed into the main file so a restart loses nothing.
+# DB lives on the persistent bucket (network-backed). We use a rollback journal
+# (DELETE mode), NOT WAL — WAL's mmap'd -wal/-shm sidecars get out of sync on
+# networked storage and corrupt the file ("database disk image is malformed").
 export SQLITE_PATH="/data/tts_arena.db"
 export AUDIO_LOG_DIR="/audio"
+
+# Drop any stale WAL sidecars left over from the old WAL config — if the app no
+# longer opens in WAL mode, a leftover -wal/-shm can confuse recovery.
+rm -f "${SQLITE_PATH}-wal" "${SQLITE_PATH}-shm" 2>/dev/null || true
+
+# Integrity guard: if the DB file exists but is corrupt, salvage what's readable
+# into a fresh file via sqlite3 .recover, keeping a timestamped copy of the
+# corrupt original. Better to come back up with the recoverable rows than to
+# loop on a malformed file. No-op when the DB is healthy or absent.
+if [ -f "$SQLITE_PATH" ]; then
+  check="$(sqlite3 "$SQLITE_PATH" 'PRAGMA integrity_check;' 2>&1 | head -1 || echo "error")"
+  if [ "$check" != "ok" ]; then
+    echo "[entrypoint] !!! DB integrity check failed ($check) — attempting recovery" >&2
+    ts="$(date -u +%Y%m%d%H%M%S)"
+    cp -f "$SQLITE_PATH" "${SQLITE_PATH}.corrupt-${ts}" 2>/dev/null || true
+    if sqlite3 "$SQLITE_PATH" ".recover" 2>/dev/null | sqlite3 "${SQLITE_PATH}.recovered-${ts}" 2>/dev/null \
+       && [ -s "${SQLITE_PATH}.recovered-${ts}" ]; then
+      mv -f "${SQLITE_PATH}.recovered-${ts}" "$SQLITE_PATH"
+      rm -f "${SQLITE_PATH}-wal" "${SQLITE_PATH}-shm" 2>/dev/null || true
+      echo "[entrypoint] recovery succeeded; corrupt original kept at ${SQLITE_PATH}.corrupt-${ts}" >&2
+    else
+      echo "[entrypoint] !!! recovery FAILED — leaving original in place for manual inspection" >&2
+    fi
+  else
+    echo "[entrypoint] DB integrity check: ok"
+  fi
+fi
 
 echo "[entrypoint] applying migrations + seed (SQLite at $SQLITE_PATH)"
 cd /app/apps/web

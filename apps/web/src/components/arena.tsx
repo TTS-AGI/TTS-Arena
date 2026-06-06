@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Dices, RotateCcw } from "lucide-react";
 import type {
@@ -46,6 +46,7 @@ export function Arena() {
   // The exact prompt last loaded from the pool (Random). The vote counts as a
   // "dataset" prompt only if the user generates with this text unchanged.
   const poolText = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [phase, setPhase] = useState<Phase>("compose");
   const [battle, setBattle] = useState<Battle | null>(null);
   const [winner, setWinner] = useState<Side | null>(null);
@@ -70,6 +71,18 @@ export function Arena() {
     b: MIN_LISTEN_SECONDS,
   });
   const canVote = listened.a && listened.b;
+
+  // Auto-grow the composer with the text, up to a cap (then it scrolls). Keeps
+  // short prompts compact while accommodating longer ones without a manual drag.
+  const TEXTAREA_MAX_PX = 220;
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const next = Math.min(el.scrollHeight, TEXTAREA_MAX_PX);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > TEXTAREA_MAX_PX ? "auto" : "hidden";
+  }, [text]);
 
   function markListened(side: Side, current: number) {
     if (current >= threshold.current[side]) {
@@ -219,6 +232,7 @@ export function Arena() {
       {/* Composer */}
       <div className="card overflow-hidden">
         <textarea
+          ref={textareaRef}
           value={text}
           rows={2}
           onChange={(e) => setText(e.target.value)}

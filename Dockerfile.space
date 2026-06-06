@@ -73,10 +73,11 @@ RUN cd apps/web && bun run build
 FROM base AS runtime
 ENV NODE_ENV=production
 
-# System deps: supervisord, ffmpeg (router audio normalization).
+# System deps: supervisord, ffmpeg (router audio normalization), sqlite3 (DB
+# integrity check + recovery on boot).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       supervisor ffmpeg \
+       supervisor ffmpeg sqlite3 \
   && rm -rf /var/lib/apt/lists/*
 
 # App: built web + full source for the router (run from source via bun).
