@@ -26,6 +26,7 @@
         "@ttsa/provider-sdk": "packages/provider-sdk",
         "@ttsa/provider-tontaube": "packages/providers/tontaube",
         "@ttsa/provider-typecast": "packages/providers/typecast",
+        "@ttsa/provider-voiceai": "packages/providers/voiceai",
         "@ttsa/shared": "packages/shared",
         "hono": "^4.6.14",
       },
@@ -51,6 +52,7 @@
         "@ttsa/provider-sdk": "packages/provider-sdk",
         "@ttsa/provider-tontaube": "packages/providers/tontaube",
         "@ttsa/provider-typecast": "packages/providers/typecast",
+        "@ttsa/provider-voiceai": "packages/providers/voiceai",
         "@ttsa/shared": "packages/shared",
         "better-sqlite3": "^12.10.0",
         "drizzle-orm": "^0.38.3",
@@ -144,6 +146,13 @@
     },
     "packages/providers/typecast": {
       "name": "@ttsa/provider-typecast",
+      "version": "0.1.0",
+      "dependencies": {
+        "@ttsa/provider-sdk": "packages/provider-sdk",
+      },
+    },
+    "packages/providers/voiceai": {
+      "name": "@ttsa/provider-voiceai",
       "version": "0.1.0",
       "dependencies": {
         "@ttsa/provider-sdk": "packages/provider-sdk",
@@ -418,11 +427,13 @@
 
     "@ttsa/provider-typecast": ["@ttsa/provider-typecast@workspace:packages/providers/typecast", { "dependencies": { "@ttsa/provider-sdk": "packages/provider-sdk" } }],
 
-    "@ttsa/router": ["@ttsa/router@workspace:apps/router", { "dependencies": { "@ttsa/provider-cartesia": "packages/providers/cartesia", "@ttsa/provider-chatterbox": "packages/providers/chatterbox", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-gradium": "packages/providers/gradium", "@ttsa/provider-hume": "packages/providers/hume", "@ttsa/provider-inworld": "packages/providers/inworld", "@ttsa/provider-mars": "packages/providers/mars", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/provider-tontaube": "packages/providers/tontaube", "@ttsa/provider-typecast": "packages/providers/typecast", "@ttsa/shared": "packages/shared", "hono": "^4.6.14" } }],
+    "@ttsa/provider-voiceai": ["@ttsa/provider-voiceai@workspace:packages/providers/voiceai", { "dependencies": { "@ttsa/provider-sdk": "packages/provider-sdk" } }],
+
+    "@ttsa/router": ["@ttsa/router@workspace:apps/router", { "dependencies": { "@ttsa/provider-cartesia": "packages/providers/cartesia", "@ttsa/provider-chatterbox": "packages/providers/chatterbox", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-gradium": "packages/providers/gradium", "@ttsa/provider-hume": "packages/providers/hume", "@ttsa/provider-inworld": "packages/providers/inworld", "@ttsa/provider-mars": "packages/providers/mars", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/provider-tontaube": "packages/providers/tontaube", "@ttsa/provider-typecast": "packages/providers/typecast", "@ttsa/provider-voiceai": "packages/providers/voiceai", "@ttsa/shared": "packages/shared", "hono": "^4.6.14" } }],
 
     "@ttsa/shared": ["@ttsa/shared@workspace:packages/shared", { "dependencies": { "zod": "^3.24.1" } }],
 
-    "@ttsa/web": ["@ttsa/web@workspace:apps/web", { "dependencies": { "@base-ui-components/react": "1.0.0-beta.1", "@cap.js/server": "^4.0.5", "@cap.js/widget": "^0.1.55", "@fingerprintjs/fingerprintjs": "^5.2.0", "@tanstack/react-query": "^5.101.0", "@tanstack/react-table": "^8.21.3", "@ttsa/provider-cartesia": "packages/providers/cartesia", "@ttsa/provider-chatterbox": "packages/providers/chatterbox", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-gradium": "packages/providers/gradium", "@ttsa/provider-hume": "packages/providers/hume", "@ttsa/provider-inworld": "packages/providers/inworld", "@ttsa/provider-mars": "packages/providers/mars", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/provider-tontaube": "packages/providers/tontaube", "@ttsa/provider-typecast": "packages/providers/typecast", "@ttsa/shared": "packages/shared", "better-sqlite3": "^12.10.0", "drizzle-orm": "^0.38.3", "jose": "^5.9.6", "lucide-react": "^1.17.0", "motion": "^11.15.0", "next": "15.1.6", "react": "19.0.0", "react-dom": "19.0.0", "recharts": "^3.8.1", "wavesurfer.js": "^7.12.7", "zod": "^3.24.1" }, "devDependencies": { "@tailwindcss/postcss": "^4.0.0", "@types/better-sqlite3": "^7.6.13", "@types/react": "^19.0.7", "@types/react-dom": "^19.0.3", "drizzle-kit": "^0.30.1", "eslint": "^9", "eslint-config-next": "15.1.6", "tailwindcss": "^4.0.0" } }],
+    "@ttsa/web": ["@ttsa/web@workspace:apps/web", { "dependencies": { "@base-ui-components/react": "1.0.0-beta.1", "@cap.js/server": "^4.0.5", "@cap.js/widget": "^0.1.55", "@fingerprintjs/fingerprintjs": "^5.2.0", "@tanstack/react-query": "^5.101.0", "@tanstack/react-table": "^8.21.3", "@ttsa/provider-cartesia": "packages/providers/cartesia", "@ttsa/provider-chatterbox": "packages/providers/chatterbox", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-gradium": "packages/providers/gradium", "@ttsa/provider-hume": "packages/providers/hume", "@ttsa/provider-inworld": "packages/providers/inworld", "@ttsa/provider-mars": "packages/providers/mars", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/provider-tontaube": "packages/providers/tontaube", "@ttsa/provider-typecast": "packages/providers/typecast", "@ttsa/provider-voiceai": "packages/providers/voiceai", "@ttsa/shared": "packages/shared", "better-sqlite3": "^12.10.0", "drizzle-orm": "^0.38.3", "jose": "^5.9.6", "lucide-react": "^1.17.0", "motion": "^11.15.0", "next": "15.1.6", "react": "19.0.0", "react-dom": "19.0.0", "recharts": "^3.8.1", "wavesurfer.js": "^7.12.7", "zod": "^3.24.1" }, "devDependencies": { "@tailwindcss/postcss": "^4.0.0", "@types/better-sqlite3": "^7.6.13", "@types/react": "^19.0.7", "@types/react-dom": "^19.0.3", "drizzle-kit": "^0.30.1", "eslint": "^9", "eslint-config-next": "15.1.6", "tailwindcss": "^4.0.0" } }],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg=="],
 

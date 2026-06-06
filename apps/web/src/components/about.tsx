@@ -101,10 +101,10 @@ const CREDITS = [
     x: "https://x.com/yoachlacombe",
   },
   {
-    name: "main",
-    avatar: "/avatars/main-horse.webp",
-    hf: "https://huggingface.co/main-horse",
-    x: "https://x.com/main_horse",
+    name: "Merve Noyan",
+    avatar: "/avatars/merve.webp",
+    hf: "https://huggingface.co/merve",
+    x: "https://x.com/mervenoyann",
   },
   {
     name: "Sanchit Gandhi",
@@ -239,7 +239,7 @@ export function About() {
                   target="_blank"
                   rel="noreferrer"
                   title={`${c.name} on Hugging Face`}
-                  className="grid h-7 w-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-line hover:text-ink"
+                  className="grid h-7 w-7 place-items-center rounded-full text-ink-3 transition-colors hover:bg-line hover:text-ink"
                 >
                   <HFLogo className="h-4 w-4" />
                 </a>
@@ -248,7 +248,7 @@ export function About() {
                   target="_blank"
                   rel="noreferrer"
                   title={`${c.name} on X`}
-                  className="grid h-7 w-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-line hover:text-ink"
+                  className="grid h-7 w-7 place-items-center rounded-full text-ink-3 transition-colors hover:bg-line hover:text-ink"
                 >
                   <XMark className="h-3.5 w-3.5" />
                 </a>

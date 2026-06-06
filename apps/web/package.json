@@ -34,6 +34,7 @@
     "@ttsa/provider-sdk": "workspace:*",
     "@ttsa/provider-tontaube": "workspace:*",
     "@ttsa/provider-typecast": "workspace:*",
+    "@ttsa/provider-voiceai": "workspace:*",
     "@ttsa/shared": "workspace:*",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.38.3",

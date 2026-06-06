@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { MODAL_IN, MODAL_OUT } from "./motion";
+import { Modal, ModalTitle, ModalDescription } from "./modal";
 
 /**
  * Cap.js proof-of-work captcha in a Framer Motion modal. Shown when the server
@@ -87,38 +86,19 @@ export function CapModal({
   }, [open]);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
-            className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1, transition: MODAL_IN }}
-            exit={{ opacity: 0, scale: 0.98, transition: MODAL_OUT }}
-            className="card fixed top-1/2 left-1/2 z-50 w-[min(92vw,22rem)] -translate-x-1/2 -translate-y-1/2 p-6 text-center shadow-[0_24px_70px_-20px_rgba(0,0,0,0.35)]"
-          >
-            <p className="text-base font-semibold">Quick check</p>
-            <p className="mx-auto mt-1 max-w-[16rem] text-sm leading-relaxed text-ink-2">
-              Please verify you are a human to continue.
-            </p>
-            <div className="mt-4 flex justify-center">
-              {/* The widget renders its own UI and emits `solve`. Its "Cap"
-                  attribution link is stripped from the shadow DOM (effect above). */}
-              <cap-widget
-                ref={widgetRef as React.RefObject<HTMLElement>}
-                data-cap-api-endpoint="/api/cap/"
-              />
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    <Modal open={open} onClose={onClose} size="sm" center>
+      <ModalTitle className="text-base">Quick check</ModalTitle>
+      <ModalDescription className="mx-auto mt-1 max-w-[16rem] leading-relaxed text-ink-2">
+        Please verify you are a human to continue.
+      </ModalDescription>
+      <div className="mt-4 flex justify-center">
+        {/* The widget renders its own UI and emits `solve`. Its "Cap"
+            attribution link is stripped from the shadow DOM (effect above). */}
+        <cap-widget
+          ref={widgetRef as React.RefObject<HTMLElement>}
+          data-cap-api-endpoint="/api/cap/"
+        />
+      </div>
+    </Modal>
   );
 }

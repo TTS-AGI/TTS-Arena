@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog } from "@base-ui-components/react/dialog";
 import { Switch } from "@base-ui-components/react/switch";
+import { Modal, ModalTitle, ModalDescription } from "@/components/modal";
 import type {
   AdminModel,
   AdminModelsResponse,
@@ -183,93 +183,75 @@ function EditModelDialog({
   });
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm" />
-        <Dialog.Popup className="card fixed top-1/2 left-1/2 z-50 w-[min(92vw,28rem)] -translate-x-1/2 -translate-y-1/2 p-6 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.35)]">
-          {model && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                mutation.mutate({
-                  name: String(fd.get("name") ?? ""),
-                  url: String(fd.get("url") ?? ""),
-                  icon: String(fd.get("icon") ?? ""),
-                  isActive: fd.get("isActive") === "on",
-                });
-              }}
+    <Modal open={open} onClose={onClose} size="md">
+      {model && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            mutation.mutate({
+              name: String(fd.get("name") ?? ""),
+              url: String(fd.get("url") ?? ""),
+              icon: String(fd.get("icon") ?? ""),
+              isActive: fd.get("isActive") === "on",
+            });
+          }}
+        >
+          <ModalTitle>Edit {model.name}</ModalTitle>
+          <ModalDescription className="mt-0.5">{model.id}</ModalDescription>
+
+          <div className="mt-4 flex flex-col gap-3">
+            <Labeled label="Display name">
+              <input name="name" defaultValue={model.name} className="input" />
+            </Labeled>
+            <Labeled label="URL">
+              <input
+                name="url"
+                defaultValue={model.url ?? ""}
+                placeholder="https://…"
+                className="input"
+              />
+            </Labeled>
+            <Labeled label="Icon URL">
+              <input
+                name="icon"
+                defaultValue={model.icon ?? ""}
+                placeholder="/logos/…svg"
+                className="input"
+              />
+            </Labeled>
+
+            <label className="flex items-center justify-between py-1">
+              <span className="text-sm font-medium">Active</span>
+              <Switch.Root
+                name="isActive"
+                defaultChecked={model.isActive}
+                className="relative h-6 w-10 rounded-full bg-line-2 transition-colors data-[checked]:bg-accent"
+              >
+                <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[checked]:translate-x-[1.125rem]" />
+              </Switch.Root>
+            </label>
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full px-4 py-2 text-sm text-ink-3 transition-colors hover:text-ink"
             >
-              <Dialog.Title className="text-lg font-semibold">
-                Edit {model.name}
-              </Dialog.Title>
-              <Dialog.Description className="mt-0.5 text-sm text-ink-3">
-                {model.id}
-              </Dialog.Description>
-
-              <div className="mt-4 flex flex-col gap-3">
-                <Labeled label="Display name">
-                  <input
-                    name="name"
-                    defaultValue={model.name}
-                    className="input"
-                  />
-                </Labeled>
-                <Labeled label="URL">
-                  <input
-                    name="url"
-                    defaultValue={model.url ?? ""}
-                    placeholder="https://…"
-                    className="input"
-                  />
-                </Labeled>
-                <Labeled label="Icon URL">
-                  <input
-                    name="icon"
-                    defaultValue={model.icon ?? ""}
-                    placeholder="/logos/…svg"
-                    className="input"
-                  />
-                </Labeled>
-
-                <label className="flex items-center justify-between py-1">
-                  <span className="text-sm font-medium">Active</span>
-                  <Switch.Root
-                    name="isActive"
-                    defaultChecked={model.isActive}
-                    className="relative h-6 w-10 rounded-full bg-line-2 transition-colors data-[checked]:bg-accent"
-                  >
-                    <Switch.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[checked]:translate-x-[1.125rem]" />
-                  </Switch.Root>
-                </label>
-              </div>
-
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-full px-4 py-2 text-sm text-ink-3 transition-colors hover:text-ink"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={mutation.isPending}
-                  className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                  {mutation.isPending ? "Saving…" : "Save"}
-                </button>
-              </div>
-            </form>
-          )}
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {mutation.isPending ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
 

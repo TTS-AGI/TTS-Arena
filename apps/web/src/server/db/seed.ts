@@ -30,6 +30,7 @@ import "@ttsa/provider-chatterbox";
 import "@ttsa/provider-inworld";
 import "@ttsa/provider-mars";
 import "@ttsa/provider-tontaube";
+import "@ttsa/provider-voiceai";
 import { db } from "./client";
 import { models } from "./schema";
 

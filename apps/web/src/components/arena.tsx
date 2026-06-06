@@ -442,14 +442,20 @@ function Contestant({
                 animate={{ opacity: 1, x: 0 }}
                 transition={SNAP}
               >
-                <a
-                  href={model.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm leading-tight font-semibold hover:text-accent"
-                >
-                  {model.name}
-                </a>
+                {model.url ? (
+                  <a
+                    href={model.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm leading-tight font-semibold hover:text-accent"
+                  >
+                    {model.name}
+                  </a>
+                ) : (
+                  <span className="text-sm leading-tight font-semibold">
+                    {model.name}
+                  </span>
+                )}
                 <p className="tag">{model.open ? "Open source" : "Closed"}</p>
               </motion.div>
             ) : (

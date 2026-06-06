@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Dialog } from "@base-ui-components/react/dialog";
+import {
+  Modal,
+  ModalTitle,
+  ModalDescription,
+  ModalClose,
+} from "@/components/modal";
 import type {
   AdminErrorOverview,
   AdminErrorRow,
@@ -355,65 +360,65 @@ function ErrorDetailDialog({
   onClose: () => void;
 }) {
   return (
-    <Dialog.Root open={!!row} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-50 bg-ink/30 backdrop-blur-sm" />
-        <Dialog.Popup className="card fixed top-1/2 left-1/2 z-50 max-h-[85vh] w-[min(94vw,42rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.35)]">
-          {row && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <Dialog.Title className="font-mono text-sm text-ink-3">
-                  {row.source}
-                  {row.route ? ` · ${row.method ?? ""} ${row.route}` : ""}
-                </Dialog.Title>
-                <Dialog.Description className="mt-1 text-base font-medium break-words">
-                  {row.message}
-                </Dialog.Description>
-                <p className="tag mt-1">{fmtDate(row.createdAt)}</p>
-              </div>
+    <Modal
+      open={!!row}
+      onClose={onClose}
+      size="lg"
+      className="max-h-[85vh] overflow-y-auto"
+    >
+      {row && (
+        <div className="flex flex-col gap-4">
+          <div>
+            <ModalTitle className="font-mono text-sm font-normal text-ink-3">
+              {row.source}
+              {row.route ? ` · ${row.method ?? ""} ${row.route}` : ""}
+            </ModalTitle>
+            <ModalDescription className="mt-1 text-base font-medium break-words text-ink">
+              {row.message}
+            </ModalDescription>
+            <p className="tag mt-1">{fmtDate(row.createdAt)}</p>
+          </div>
 
-              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-                <Meta label="Severity" value={row.severity} />
-                <Meta label="Provider" value={row.provider} />
-                <Meta label="Model" value={row.model} />
-                <Meta
-                  label="Status"
-                  value={row.status != null ? String(row.status) : null}
-                />
-                <Meta
-                  label="User"
-                  value={row.userId != null ? String(row.userId) : null}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+            <Meta label="Severity" value={row.severity} />
+            <Meta label="Provider" value={row.provider} />
+            <Meta label="Model" value={row.model} />
+            <Meta
+              label="Status"
+              value={row.status != null ? String(row.status) : null}
+            />
+            <Meta
+              label="User"
+              value={row.userId != null ? String(row.userId) : null}
+            />
+          </div>
 
-              {row.detail && (
-                <div>
-                  <p className="tag mb-1.5">Detail</p>
-                  <pre className="max-h-40 overflow-auto rounded-md bg-fill/60 p-3 font-mono text-xs whitespace-pre-wrap text-ink-2">
-                    {prettyJson(row.detail)}
-                  </pre>
-                </div>
-              )}
-
-              {row.stack && (
-                <div>
-                  <p className="tag mb-1.5">Stack</p>
-                  <pre className="max-h-72 overflow-auto rounded-md bg-fill/60 p-3 font-mono text-xs whitespace-pre-wrap text-ink-2">
-                    {row.stack}
-                  </pre>
-                </div>
-              )}
-
-              <div className="flex justify-end">
-                <Dialog.Close className="rounded-md bg-fill px-3 py-1.5 text-sm font-medium transition-colors hover:bg-line">
-                  Close
-                </Dialog.Close>
-              </div>
+          {row.detail && (
+            <div>
+              <p className="tag mb-1.5">Detail</p>
+              <pre className="max-h-40 overflow-auto rounded-md bg-fill/60 p-3 font-mono text-xs whitespace-pre-wrap text-ink-2">
+                {prettyJson(row.detail)}
+              </pre>
             </div>
           )}
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+
+          {row.stack && (
+            <div>
+              <p className="tag mb-1.5">Stack</p>
+              <pre className="max-h-72 overflow-auto rounded-md bg-fill/60 p-3 font-mono text-xs whitespace-pre-wrap text-ink-2">
+                {row.stack}
+              </pre>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <ModalClose className="rounded-md bg-fill px-3 py-1.5 text-sm font-medium transition-colors hover:bg-line">
+              Close
+            </ModalClose>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

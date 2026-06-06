@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LeaderboardResponse, LeaderboardRow } from "@ttsa/shared";
 import { ModelLogo } from "./model-logo";
+import { StealthModal } from "./stealth-modal";
+
+/** Stealth (anonymous pre-release) models are marked by the ghost logo. */
+const STEALTH_ICON = "/logos/stealth.webp";
+const isStealth = (m: LeaderboardRow) => m.icon === STEALTH_ICON;
 
 type SortKey = "elo" | "winRate" | "totalVotes";
 const SORTS: { key: SortKey; label: string }[] = [
@@ -15,6 +20,7 @@ export function Leaderboard() {
   const [sort, setSort] = useState<SortKey>("elo");
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState(false);
+  const [stealthOpen, setStealthOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -94,10 +100,13 @@ export function Leaderboard() {
               displayRank={i + 1}
               sort={sort}
               eloRange={eloRange}
+              onStealthClick={() => setStealthOpen(true)}
             />
           ))}
         </div>
       )}
+
+      <StealthModal open={stealthOpen} onClose={() => setStealthOpen(false)} />
     </div>
   );
 }
@@ -107,11 +116,13 @@ function Row({
   displayRank,
   sort,
   eloRange,
+  onStealthClick,
 }: {
   model: LeaderboardRow;
   displayRank: number;
   sort: SortKey;
   eloRange: { min: number; max: number };
+  onStealthClick: () => void;
 }) {
   const eloFrac =
     (model.elo - eloRange.min) / (eloRange.max - eloRange.min || 1);
@@ -143,14 +154,27 @@ function Row({
 
       <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
         <ModelLogo icon={model.icon} />
-        <a
-          href={model.url}
-          target="_blank"
-          rel="noreferrer"
-          className="truncate text-[0.95rem] leading-tight font-semibold hover:text-accent"
-        >
-          {model.name}
-        </a>
+        {isStealth(model) ? (
+          <button
+            onClick={onStealthClick}
+            className="truncate text-left text-[0.95rem] leading-tight font-semibold hover:text-accent"
+          >
+            {model.name}
+          </button>
+        ) : model.url ? (
+          <a
+            href={model.url}
+            target="_blank"
+            rel="noreferrer"
+            className="truncate text-[0.95rem] leading-tight font-semibold hover:text-accent"
+          >
+            {model.name}
+          </a>
+        ) : (
+          <span className="truncate text-[0.95rem] leading-tight font-semibold">
+            {model.name}
+          </span>
+        )}
       </div>
 
       <div className="relative text-right">

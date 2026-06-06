@@ -49,6 +49,7 @@ jobs:
       - name: Push to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          PRIVATE_PROVIDERS_TOKEN: ${{ secrets.PRIVATE_PROVIDERS_TOKEN }}
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
@@ -64,6 +65,40 @@ jobs:
           # Space README + Dockerfile take precedence; GitHub's stay in the repo.
           mv /tmp/space/SPACES_README.md /tmp/space/README.md
           mv /tmp/space/Dockerfile.space /tmp/space/Dockerfile
+
+          # Cache-bust the private-providers clone layer. That RUN clones a repo
+          # behind a fixed command, so Docker reuses a stale layer and the Space
+          # keeps an OLD snapshot of the private repo forever (new private models
+          # never appear). Stamp the private repo's current HEAD SHA into the
+          # Dockerfile's PRIVATE_PROVIDERS_REF default so the layer's cache key
+          # changes whenever the private repo changes. Read the repo path from
+          # the Dockerfile default (authoritative) rather than a secret whose
+          # format we can't rely on.
+          REPO="$(sed -n 's/^ARG PRIVATE_PROVIDERS_REPO=//p' /tmp/space/Dockerfile | head -1)"
+          REPO="${REPO:-TTS-AGI/private-providers}"
+          if [ -z "${PRIVATE_PROVIDERS_TOKEN:-}" ]; then
+            echo "note: PRIVATE_PROVIDERS_TOKEN not available to this job"
+          fi
+          # Resolve HEAD via the GitHub API (works reliably with fine-grained
+          # PATs); fall back to git ls-remote. Either way it's non-fatal.
+          REF="$(curl -sf \
+            -H "Authorization: Bearer ${PRIVATE_PROVIDERS_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/commits/HEAD" \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["sha"])' 2>/dev/null || true)"
+          if [ -z "$REF" ]; then
+            REF="$(git ls-remote "https://x-access-token:${PRIVATE_PROVIDERS_TOKEN}@github.com/${REPO}.git" HEAD 2>/dev/null | cut -f1)"
+          fi
+          if [ -n "$REF" ]; then
+            sed -i "s|^ARG PRIVATE_PROVIDERS_REF=.*|ARG PRIVATE_PROVIDERS_REF=${REF}|" /tmp/space/Dockerfile
+            echo "pinned private providers ref to ${REF:0:7}"
+          else
+            # Last resort: a timestamp still busts the cache every deploy (the
+            # clone always fetches latest), at the cost of no layer reuse.
+            STAMP="$(date -u +%Y%m%d%H%M%S)"
+            sed -i "s|^ARG PRIVATE_PROVIDERS_REF=.*|ARG PRIVATE_PROVIDERS_REF=ts-${STAMP}|" /tmp/space/Dockerfile
+            echo "WARNING: could not resolve private HEAD; busting cache with timestamp ts-${STAMP}" >&2
+          fi
 
           # Deploy as a single fresh commit (orphan history). This keeps the
           # Space itself (repo + config) intact while ensuring no stray blob

@@ -32,7 +32,14 @@ COPY packages/ packages/
 # PRIVATE_PROVIDERS_REPO defaults to the known repo; override via build arg.
 # If the secret is absent the build still succeeds (no private providers).
 ARG PRIVATE_PROVIDERS_REPO=TTS-AGI/private-providers
+# Cache-buster: the `git clone` below is a fixed command, so Docker would reuse
+# a stale layer and silently keep an OLD snapshot of the private repo forever
+# (new private providers never appear). The deploy passes the private repo's
+# current HEAD SHA here; when it changes, this layer's cache key changes and the
+# clone re-runs. Defaults to "dev" for local builds.
+ARG PRIVATE_PROVIDERS_REF=dev
 RUN --mount=type=secret,id=PRIVATE_PROVIDERS_TOKEN,mode=0444,required=false \
+    echo "private providers ref: ${PRIVATE_PROVIDERS_REF}"; \
     if [ -s /run/secrets/PRIVATE_PROVIDERS_TOKEN ]; then \
       tok="$(cat /run/secrets/PRIVATE_PROVIDERS_TOKEN)"; \
       git clone --depth 1 \
