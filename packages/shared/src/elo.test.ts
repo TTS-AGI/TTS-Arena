@@ -25,7 +25,7 @@ describe("constants match upstream", () => {
   test("base, k-factor, and ranking threshold", () => {
     expect(BASE_ELO).toBe(1500);
     expect(ELO_K).toBe(2);
-    expect(RANK_THRESHOLD).toBe(250);
+    expect(RANK_THRESHOLD).toBe(100);
   });
 });
 
@@ -100,9 +100,9 @@ describe("tierFor", () => {
 });
 
 describe("isRanked", () => {
-  test("strictly greater than the threshold", () => {
-    expect(isRanked(RANK_THRESHOLD)).toBe(false);
-    expect(isRanked(RANK_THRESHOLD + 1)).toBe(true);
+  test("at least the threshold", () => {
+    expect(isRanked(RANK_THRESHOLD)).toBe(true);
+    expect(isRanked(RANK_THRESHOLD - 1)).toBe(false);
     expect(isRanked(0)).toBe(false);
   });
 });

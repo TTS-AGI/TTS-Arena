@@ -105,6 +105,11 @@ export const leaderboardRowSchema = z.object({
   open: z.boolean(),
   /** True while the model has < ESTABLISHED_THRESHOLD counted votes. */
   preliminary: z.boolean(),
+  /**
+   * False for retired models kept on the board for their historical rating
+   * (no longer battled). The UI badges these "no longer active".
+   */
+  active: z.boolean(),
 });
 export type LeaderboardRow = z.infer<typeof leaderboardRowSchema>;
 

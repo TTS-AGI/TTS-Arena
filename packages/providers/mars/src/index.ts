@@ -68,6 +68,7 @@ registerArenaModels([
     open: false,
     provider: "mars",
     routerModel: "mars",
-    enabled: true,
+    // Temporarily disabled — not battled or tested for now.
+    enabled: false,
   },
 ]);

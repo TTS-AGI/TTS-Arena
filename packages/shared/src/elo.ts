@@ -8,8 +8,13 @@
 export const BASE_ELO = 1500;
 /** Deliberately small so ratings move slowly and stay stable. */
 export const ELO_K = 2;
-/** A model needs strictly more than this many counted matches to be ranked. */
-export const RANK_THRESHOLD = 250;
+/**
+ * A model needs at least this many counted matches to appear on the public
+ * leaderboard. Below it, the rating is too noisy to be meaningful (a handful of
+ * votes can swing it wildly), so the model is hidden until it earns enough
+ * battles — it still competes in the arena meanwhile.
+ */
+export const RANK_THRESHOLD = 100;
 /**
  * Vote count at which a model's rating switches from live Glicko-2 (stable when
  * data is sparse) to the Bradley–Terry fit (the principled global ranking once
@@ -65,5 +70,5 @@ export function tierFor(rank: number): Tier | null {
 
 /** Whether a model with this many counted matches appears on the public board. */
 export function isRanked(matchCount: number): boolean {
-  return matchCount > RANK_THRESHOLD;
+  return matchCount >= RANK_THRESHOLD;
 }

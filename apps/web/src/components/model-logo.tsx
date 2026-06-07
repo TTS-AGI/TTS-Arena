@@ -19,6 +19,16 @@ const FULL_BLEED = new Set([
   "/logos/gradium.webp",
   "/logos/camb.webp",
   "/logos/default.webp",
+  // Legacy (retired) model logos that ship their own background.
+  "/logos/maya.webp",
+  "/logos/nvidia.webp",
+  "/logos/wordcab.webp",
+  "/logos/spark.webp",
+  "/logos/neuphonic.webp",
+  "/logos/kokoro.webp",
+  "/logos/papla.webp",
+  "/logos/castleflow.webp",
+  // tontaube keeps the white tile (NOT full-bleed) — see DB icon.
 ]);
 
 /**

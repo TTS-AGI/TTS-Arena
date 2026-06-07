@@ -124,6 +124,18 @@ const CREDITS = [
     hf: "https://huggingface.co/pcuenq",
     x: "https://x.com/pcuenq",
   },
+  {
+    name: "main",
+    avatar: "/avatars/main-horse.webp",
+    hf: "https://huggingface.co/main-horse",
+    x: "https://x.com/main_horse",
+  },
+  {
+    name: "Steven Zheng",
+    avatar: "/avatars/Steveeeeeeen.webp",
+    hf: "https://huggingface.co/Steveeeeeeen",
+    x: "https://x.com/Tu7uruu",
+  },
 ];
 
 const LINKS = [

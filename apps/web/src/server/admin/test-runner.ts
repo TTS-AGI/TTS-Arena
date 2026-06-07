@@ -21,6 +21,9 @@ import { errInfo } from "../observability/errors";
 const TEST_SENTENCE =
   "The quick brown fox jumps over the lazy dog near the riverbank.";
 
+/** Max models synthesized concurrently in a run (bounds memory + provider load). */
+const TEST_CONCURRENCY = 16;
+
 const AUDIO_DIR = resolve(
   process.env.AUDIO_CACHE_DIR ?? ".audio-cache",
   "tests",
@@ -160,17 +163,32 @@ async function drainRun(runId: number): Promise<void> {
         ),
     );
 
-    for (;;) {
-      const next = await db.query.testResults.findFirst({
-        where: and(
-          eq(testResults.runId, runId),
-          eq(testResults.status, "pending"),
-        ),
-      });
-      if (!next) break;
-      await runOne(runId, next.id);
-      await refreshRunCounts(runId);
-    }
+    // Snapshot all pending rows and run them with bounded concurrency. Every
+    // model is synthesized in parallel (up to TEST_CONCURRENCY at a time) rather
+    // than one-by-one, so a full run finishes in roughly the slowest model's
+    // time instead of the sum of all of them. The cap keeps peak memory and
+    // provider load sane on the single-process Space.
+    const pending = await db
+      .select({ id: testResults.id })
+      .from(testResults)
+      .where(
+        and(eq(testResults.runId, runId), eq(testResults.status, "pending")),
+      );
+
+    let cursor = 0;
+    const worker = async () => {
+      for (;;) {
+        const i = cursor++;
+        if (i >= pending.length) return;
+        await runOne(runId, pending[i]!.id);
+        await refreshRunCounts(runId);
+      }
+    };
+    const workers = Array.from(
+      { length: Math.min(TEST_CONCURRENCY, pending.length) },
+      () => worker(),
+    );
+    await Promise.all(workers);
 
     await finalizeRun(runId);
   } finally {

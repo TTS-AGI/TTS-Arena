@@ -13,6 +13,7 @@
 import { eq } from "drizzle-orm";
 import {
   isEstablished,
+  isRanked,
   tierFor,
   type LeaderboardRow,
   type ModelType,
@@ -29,9 +30,12 @@ export async function getLeaderboard(
     getBTRatings(type),
   ]);
 
-  // Build each row from the appropriate rating source.
+  // Build each row from the appropriate rating source. Only models with enough
+  // counted matches are ranked — below RANK_THRESHOLD the rating is too noisy
+  // (a handful of votes can swing it wildly), so they're hidden until they earn
+  // more.
   const rows = typeModels
-    .filter((m) => m.matchCount > 0)
+    .filter((m) => isRanked(m.matchCount))
     .map((m) => {
       const established = isEstablished(m.matchCount);
       const btRating = bt.get(m.id)?.rating;
@@ -49,6 +53,7 @@ export async function getLeaderboard(
         totalVotes: m.matchCount,
         open: m.isOpen,
         preliminary: !established,
+        active: m.isActive,
       };
     });
 

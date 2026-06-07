@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Modal, ModalTitle, ModalDescription } from "./modal";
 
 /**
@@ -22,37 +22,44 @@ export function CapModal({
   onSolved: (token: string) => void;
   onClose: () => void;
 }) {
-  const widgetRef = useRef<HTMLElement | null>(null);
+  // Keep the latest onSolved in a ref so the event listener is attached ONCE
+  // (via the ref callback, the instant the element mounts) and never has to be
+  // re-bound — re-binding on each render races with the widget, which can solve
+  // speculatively and fire `solve` in the gap, so the token would be lost and
+  // the user gets stuck on a "completed" captcha that never proceeds.
+  const onSolvedRef = useRef(onSolved);
+  onSolvedRef.current = onSolved;
 
   // Lazy-load the widget script once, on first open (registers <cap-widget>).
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
     import("@cap.js/widget/cap.min.js").catch(() => {
       // If it fails to load, the modal still shows a message; user can retry.
-      if (!cancelled) return;
     });
-    return () => {
-      cancelled = true;
-    };
   }, [open]);
 
-  // Wire the solve event.
-  useEffect(() => {
-    const el = widgetRef.current;
-    if (!el || !open) return;
-    const handler = (e: Event) => {
-      const token = (e as CapSolveEvent).detail?.token;
-      if (token) onSolved(token);
+  // Ref callback: bind listeners the moment the element exists, unbind when it
+  // unmounts. This runs before any render-driven effect, so we can't miss an
+  // early `solve` from the widget's speculative cache. `cap-token` arrives via
+  // the `solve` event detail; we also read it off the element as a fallback.
+  const bindWidget = useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    const onSolve = (e: Event) => {
+      const token =
+        (e as CapSolveEvent).detail?.token ??
+        (el as HTMLElement & { token?: string }).token;
+      if (token) onSolvedRef.current(token);
     };
-    el.addEventListener("solve", handler as EventListener);
-    return () => el.removeEventListener("solve", handler as EventListener);
-  }, [open, onSolved]);
+    el.addEventListener("solve", onSolve as EventListener);
+    // The widget is remounted (key) on each open, so React tears down this node
+    // and the listener with it — no explicit removal needed.
+  }, []);
 
   // Remove the library's "Cap" attribution link. It lives in the widget's
   // shadow DOM with inline `!important` styles, so page CSS can't touch it —
   // we strip the `.credits` node directly and keep watching in case it
   // re-renders (the widget re-renders on state changes).
+  const widgetRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
     let observer: MutationObserver | null = null;
@@ -66,8 +73,6 @@ export function CapModal({
       }
       return false;
     };
-    // Try immediately, then poll briefly until the shadow root exists, then
-    // observe it so a re-render can't bring the link back.
     const interval = setInterval(() => {
       const root = (widgetRef.current as Element & { shadowRoot?: ShadowRoot })
         ?.shadowRoot;
@@ -85,6 +90,15 @@ export function CapModal({
     };
   }, [open]);
 
+  // Compose the two refs (listener-binding + shadow-DOM stripping) onto one node.
+  const setRef = useCallback(
+    (el: HTMLElement | null) => {
+      widgetRef.current = el;
+      bindWidget(el);
+    },
+    [bindWidget],
+  );
+
   return (
     <Modal open={open} onClose={onClose} size="sm" center>
       <ModalTitle className="text-base">Quick check</ModalTitle>
@@ -93,11 +107,16 @@ export function CapModal({
       </ModalDescription>
       <div className="mt-4 flex justify-center">
         {/* The widget renders its own UI and emits `solve`. Its "Cap"
-            attribution link is stripped from the shadow DOM (effect above). */}
-        <cap-widget
-          ref={widgetRef as React.RefObject<HTMLElement>}
-          data-cap-api-endpoint="/api/cap/"
-        />
+            attribution link is stripped from the shadow DOM (effect above).
+            key={open} forces a fresh widget each time the modal opens, so a
+            stale "already solved" state can't suppress a new solve event. */}
+        {open && (
+          <cap-widget
+            key="cap"
+            ref={setRef}
+            data-cap-api-endpoint="/api/cap/"
+          />
+        )}
       </div>
     </Modal>
   );

@@ -9,6 +9,11 @@ import { StealthModal } from "./stealth-modal";
 const STEALTH_ICON = "/logos/stealth.webp";
 const isStealth = (m: LeaderboardRow) => m.icon === STEALTH_ICON;
 
+/** Compact vote count: 1234 → "1.2k". */
+function fmtVotes(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
 type SortKey = "elo" | "winRate" | "totalVotes";
 const SORTS: { key: SortKey; label: string }[] = [
   { key: "elo", label: "Rating" },
@@ -132,9 +137,7 @@ function Row({
       ? model.elo
       : sort === "winRate"
         ? `${model.winRate.toFixed(0)}%`
-        : model.totalVotes >= 1000
-          ? `${(model.totalVotes / 1000).toFixed(1)}k`
-          : String(model.totalVotes);
+        : fmtVotes(model.totalVotes);
   const valueLabel =
     sort === "elo" ? "rating" : sort === "winRate" ? "win rate" : "votes";
 
@@ -154,27 +157,42 @@ function Row({
 
       <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
         <ModelLogo icon={model.icon} />
-        {isStealth(model) ? (
-          <button
-            onClick={onStealthClick}
-            className="truncate text-left text-[0.95rem] leading-tight font-semibold hover:text-accent"
-          >
-            {model.name}
-          </button>
-        ) : model.url ? (
-          <a
-            href={model.url}
-            target="_blank"
-            rel="noreferrer"
-            className="truncate text-[0.95rem] leading-tight font-semibold hover:text-accent"
-          >
-            {model.name}
-          </a>
-        ) : (
-          <span className="truncate text-[0.95rem] leading-tight font-semibold">
-            {model.name}
-          </span>
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            {isStealth(model) ? (
+              <button
+                onClick={onStealthClick}
+                className="truncate text-left text-[0.95rem] leading-tight font-semibold hover:text-accent"
+              >
+                {model.name}
+              </button>
+            ) : model.url ? (
+              <a
+                href={model.url}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-[0.95rem] leading-tight font-semibold hover:text-accent"
+              >
+                {model.name}
+              </a>
+            ) : (
+              <span className="truncate text-[0.95rem] leading-tight font-semibold">
+                {model.name}
+              </span>
+            )}
+            {!model.active && (
+              <span
+                className="shrink-0 rounded-full border border-line bg-sunk px-2 py-0.5 text-[0.7rem] font-medium text-ink-3"
+                title="This model has been retired and is no longer in rotation. Its rating is preserved from past votes."
+              >
+                Retired
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-ink-4">
+            {fmtVotes(model.totalVotes)} votes
+          </p>
+        </div>
       </div>
 
       <div className="relative text-right">

@@ -1,7 +1,7 @@
 /**
  * Cap.js proof-of-work captcha, embedded (no Redis/standalone server). Challenge
- * + token state is persisted in SQLite (cap_challenges / cap_tokens) via a custom
- * storage adapter, so it survives restarts and works on the single-file DB.
+ * + token state is persisted in Postgres (cap_challenges / cap_tokens) via a
+ * custom storage adapter, so it survives restarts.
  *
  * Flow: client widget GETs a challenge (/api/cap/challenge → createChallenge),
  * solves the PoW, POSTs solutions (/api/cap/redeem → redeemChallenge) to get a
