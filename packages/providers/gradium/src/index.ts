@@ -1,11 +1,17 @@
 /**
- * Gradium TTS provider. Single model, rotates a curated voice list, returns
- * the audio bytes the API streams back.
+ * Gradium TTS provider. Single model, rotates a curated voice list.
+ *
+ * The API responds with an NDJSON stream (application/x-ndjson): one JSON object
+ * per line, either {"type":"text",...} word-timing events or
+ * {"type":"audio","audio":"<base64 pcm>"} chunks. The audio is raw headerless
+ * PCM (signed 16-bit LE, 48 kHz, mono). We concatenate the chunks and wrap them
+ * in a WAV header so the result is a real, playable file.
  */
 import {
   ProviderError,
   env,
   httpFetch,
+  pcmToWav,
   pickRandom,
   registerArenaModels,
   registerProvider,
@@ -15,6 +21,9 @@ import {
   type SynthesizeResult,
   type TTSProvider,
 } from "@ttsa/provider-sdk";
+
+/** Gradium streams raw PCM at this format (no header on the wire). */
+const GRADIUM_SAMPLE_RATE = 48_000;
 
 const ENDPOINT = "https://api.gradium.ai/api/post/speech/tts";
 const ICON = "/logos/gradium.webp";
@@ -58,8 +67,33 @@ export const gradium: TTSProvider = {
       },
       "Gradium",
     );
+
+    // Parse the NDJSON stream and gather the PCM audio chunks in order.
+    const text = await res.text();
+    const chunks: Buffer[] = [];
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let event: { type?: string; audio?: string };
+      try {
+        event = JSON.parse(trimmed);
+      } catch {
+        continue; // skip any partial/non-JSON line
+      }
+      if (event.type === "audio" && event.audio) {
+        chunks.push(Buffer.from(event.audio, "base64"));
+      }
+    }
+    if (chunks.length === 0) {
+      throw new ProviderError(
+        "Gradium: no audio in response stream",
+        "upstream_error",
+      );
+    }
+    const pcm = Buffer.concat(chunks);
+    const wav = pcmToWav(pcm, { sampleRate: GRADIUM_SAMPLE_RATE });
     return {
-      audioBase64: toBase64(await res.arrayBuffer()),
+      audioBase64: toBase64(wav),
       extension: "wav",
       voice,
       model: "gradium",
