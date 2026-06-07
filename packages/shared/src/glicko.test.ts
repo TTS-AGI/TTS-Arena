@@ -13,11 +13,13 @@ describe("glickoUpdate", () => {
     const opp = defaultGlicko();
     const after = glickoUpdate(player, [{ opponent: opp, score: 1 }]);
     expect(after.rating).toBeGreaterThan(DEFAULT_RATING);
-    // With the tuned initial RD (~60), one even win moves ~10 points — the
-    // same order of magnitude as Elo, not the >150 of the textbook RD=350.
-    expect(after.rating - DEFAULT_RATING).toBeLessThan(20);
-    // RD stays bounded (it equilibrates near its starting value, not exploding).
-    expect(after.rd).toBeLessThanOrEqual(DEFAULT_RD + 1);
+    // A brand-new model (high initial RD) moves a lot on its first vote — that's
+    // correct for a near-unknown competitor. It's bounded (well under the
+    // textbook RD=350's >150), and the public board hides this via the vote gate
+    // + conservative (lower-bound) ranking, so users never see the early noise.
+    expect(after.rating - DEFAULT_RATING).toBeLessThan(130);
+    // The first win already tightens RD below the (high) starting value.
+    expect(after.rd).toBeLessThan(DEFAULT_RD);
   });
 
   test("from a high RD, a win does shrink RD (uncertainty tightens)", () => {

@@ -25,7 +25,7 @@ const STEPS = [
   {
     n: "04",
     t: "Rank",
-    d: "Your vote updates both models' ratings in real time.",
+    d: "Your vote feeds the fit that ranks both models on the board.",
   },
 ];
 
@@ -33,21 +33,17 @@ const NOTES = [
   "Sign in with Hugging Face to vote — accounts must be at least 30 days old.",
   "Prompts are English-only for now and capped at 1,000 characters.",
   "Models stay anonymous until you've voted; only then are A and B revealed.",
-  "New models start with a live Glicko-2 rating shown as provisional; once a model passes 300 votes, its place on the board is set by a Bradley–Terry fit over every matchup.",
+  "The board is ranked by a Bradley–Terry fit over every matchup, sorted by a conservative lower bound so a model has to be both good and certain to rank highly. Models under 300 votes are badged provisional while their rating settles.",
 ];
 
 const FAQ = [
   {
     q: "How are models ranked?",
-    a: "Every vote is a head-to-head result. Below 300 votes a model carries a live Glicko-2 rating, flagged as provisional. Past that, its standing is fixed by a Bradley–Terry fit computed over the full history of matchups — so the board reflects all the evidence, not just the last few votes.",
+    a: "Every vote is a head-to-head result. The board is ranked by a single Bradley–Terry fit over the full history of matchups — the maximum-likelihood strengths that best explain every recorded comparison, so it reflects all the evidence at once. We show each model's rating but rank by a conservative lower bound, so a model can't top the board on a lucky few votes — it must be both good and certain. A model needs 100 votes to appear, and shows as provisional until 300.",
   },
   {
     q: "Why blind comparisons?",
     a: "Naming a model colors how people hear it. Hiding identities until after the vote keeps the judgment about the audio alone — the same reason listening tests have always been blind.",
-  },
-  {
-    q: "Is this related to the old TTS Arena?",
-    a: "This is a fresh start. The original v1 leaderboard is frozen and kept for reference; none of its votes carry over. Every model here begins from scratch.",
   },
   {
     q: "Can I get a model added?",

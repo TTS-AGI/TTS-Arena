@@ -6,12 +6,14 @@ import type { LeaderboardResponse, ModelType } from "@ttsa/shared";
 import { getLeaderboard } from "@/server/arena/leaderboard";
 
 export async function GET(req: Request) {
-  const type = (new URL(req.url).searchParams.get("type") ??
-    "tts") as ModelType;
+  const params = new URL(req.url).searchParams;
+  const type = (params.get("type") ?? "tts") as ModelType;
   if (type !== "tts" && type !== "conversational") {
     return NextResponse.json({ error: "invalid type" }, { status: 400 });
   }
-  const rows = await getLeaderboard(type);
+  // ?preliminary=1 lowers the vote floor so newly-added models are visible.
+  const includePreliminary = params.get("preliminary") === "1";
+  const rows = await getLeaderboard(type, includePreliminary);
   const body: LeaderboardResponse = { rows };
   return NextResponse.json(body);
 }

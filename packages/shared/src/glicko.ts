@@ -20,14 +20,29 @@ export type Glicko = {
 
 export const DEFAULT_RATING = 1500;
 /**
- * Initial rating deviation. The textbook default is 350, but that makes a
- * model's first few votes swing by >150 points — wildly out of scale with the
- * Elo (k=2) the rest of the system uses. 60 keeps early movement to ~10 points
- * and single digits once a model has some games, so Glicko-2 and Elo sit on
- * roughly the same scale and the Glicko→Bradley–Terry handoff isn't jarring.
+ * Initial rating deviation — high, so a brand-new model is correctly treated as
+ * uncertain and its RD *contracts* as evidence arrives (the whole point of
+ * Glicko over Elo). 200 sits between the textbook 350 and a tighter start: with
+ * our volatility it converges to ~30 once a model is established and stays high
+ * (~130+) for the first handful of votes.
+ *
+ * Early models therefore swing by ~100 points on their first vote — that's the
+ * correct, honest behavior for a near-unknown competitor. We never *show* that
+ * noise: the public board only lists models past RANK_THRESHOLD votes, and we
+ * rank by the conservative lower bound (rating − 2·RD), so a model can't ride a
+ * lucky small sample to the top. (The old code pinned DEFAULT_RD=60 to hide the
+ * swings, but that also froze RD ~60 forever — disabling Glicko's uncertainty
+ * entirely. The display gate + conservative bound are the right fix instead.)
  */
-export const DEFAULT_RD = 60;
-export const DEFAULT_VOL = 0.06;
+export const DEFAULT_RD = 200;
+/**
+ * Initial (and effective) volatility. Lower than the textbook 0.06 on purpose:
+ * because we run one match per rating period, 0.06 inflates RD by ~10 display
+ * points *every vote*, which floors RD around 60 no matter how many games are
+ * played. 0.015 lets a well-determined model's RD settle near 30 (Glickman's
+ * recommended range for established competitors) while still adapting per model.
+ */
+export const DEFAULT_VOL = 0.015;
 
 /** System constant τ: constrains volatility change. 0.3–1.2 typical. */
 const TAU = 0.5;

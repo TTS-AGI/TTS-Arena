@@ -1,31 +1,51 @@
 ---
 title: How ranking works
-description: Glicko-2 while provisional, Bradley–Terry once established.
+description: One Bradley–Terry fit over every matchup, ranked by a conservative lower bound.
 ---
 
 Every vote is a head-to-head result between two models. We turn that stream of
-pairwise outcomes into a single leaderboard with a two-stage rating system.
+pairwise outcomes into a single leaderboard.
 
-## Provisional: Glicko-2
+## One model: Bradley–Terry
 
-A new model starts with a live **Glicko-2** rating (centered on 1500) and a
-high rating deviation — the system is uncertain about it, so its position can
-move quickly. While a model has fewer than the established threshold of counted
-votes, it's shown as **provisional** on the board.
+The board is ranked by a single **Bradley–Terry** fit over the full history of
+matchups. Bradley–Terry finds the maximum-likelihood "strength" of every model
+that best explains every recorded head-to-head at once — so the ranking reflects
+_all_ the evidence, not just the last few votes, and it's order-independent
+(replaying the same votes always gives the same result).
 
-This stage exists so a freshly added model appears almost immediately and finds
-its rough level within a handful of matchups, without waiting for thousands of
-votes.
+Ratings are centered on ~1500. The fit is cached and recomputed as new votes
+accumulate, so the board stays current without refitting on every single vote.
 
-## Established: Bradley–Terry
+## Ranked by the lower bound, not the point estimate
 
-Once a model passes the threshold, its standing is fixed by a **Bradley–Terry**
-fit computed over the full history of matchups. Rather than leaning on the last
-few votes, the board reflects _all_ the evidence at once — the maximum-likelihood
-strengths that best explain every recorded head-to-head.
+We **display** each model's point rating, but we **rank** by a conservative
+_lower bound_ — the bottom of its confidence interval. A model can't top the
+board on a lucky handful of votes: it has to be both good **and** certain. As a
+model plays more, its interval tightens and the displayed `± uncertainty`
+shrinks. You'll see large error bars on new models and small ones on
+well-established ones.
 
-The fit is cached and recomputed as new votes accumulate, so the established
-portion of the board stays current without refitting on every single vote.
+## Small samples are regularized
+
+A maximum-likelihood fit has a sharp edge: a model that has only ever won (or
+only ever lost) has an undefined "infinite" strength, which on a tiny sample
+would produce a nonsense rating. We add a light **Bayesian prior** — a couple of
+virtual, evenly-split games against an average opponent — to every model. This
+pulls extreme records on tiny samples toward the center, and the effect
+_vanishes_ as real games accumulate: by a few dozen votes it's negligible, and
+by a few hundred it's gone entirely. It only ever disciplines the smallest
+samples.
+
+## When models appear
+
+- A model must reach **100 counted votes** to appear on the default board —
+  below that, the rating is too noisy to be meaningful.
+- Below **300 votes** a model is badged **Preliminary**: it's ranked normally,
+  but its rating is still settling and may move as more votes land.
+- Newly added models with only a few votes are hidden by default; tick **“Show
+  new models with few votes”** on the leaderboard to reveal them (with wide
+  uncertainty bars).
 
 ## Why blind, why pairwise
 

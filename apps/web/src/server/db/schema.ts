@@ -89,12 +89,14 @@ export const models = pgTable("models", {
   icon: text("icon"),
 
   // ── Live Glicko-2 state ──
+  // Defaults mirror @ttsa/shared DEFAULT_RATING/RD/VOL — a fresh model starts
+  // here and its RD contracts as votes arrive.
   /** Display rating (Glicko-2, centered on 1500). */
   rating: doublePrecision("rating").notNull().default(1500),
   /** Rating deviation — uncertainty; high until enough games are played. */
-  ratingDeviation: doublePrecision("rating_deviation").notNull().default(350),
+  ratingDeviation: doublePrecision("rating_deviation").notNull().default(200),
   /** Volatility — expected fluctuation in performance. */
-  volatility: doublePrecision("volatility").notNull().default(0.06),
+  volatility: doublePrecision("volatility").notNull().default(0.015),
 
   // ── Denormalized counters (cheap reads; derived from votes) ──
   winCount: integer("win_count").notNull().default(0),

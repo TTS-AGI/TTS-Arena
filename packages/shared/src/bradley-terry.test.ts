@@ -81,4 +81,34 @@ describe("bradleyTerry", () => {
     expect(ranked).toHaveLength(2);
     for (const r of ranked) expect(Number.isFinite(r.rating)).toBe(true);
   });
+
+  test("an undefeated model gets a finite, sane rating (no separation blowup)", () => {
+    // Without the prior, a perfect record is an MLE of +infinity — a single
+    // lucky win once produced a nonsense ~2400 rating. The prior caps it.
+    const ranked = bradleyTerry(
+      ["winner", "loser"],
+      games("winner", "loser", 1),
+      0,
+    );
+    const w = ranked.find((r) => r.id === "winner")!;
+    expect(Number.isFinite(w.rating)).toBe(true);
+    // One win moves it above center but nowhere near the old blowup.
+    expect(w.rating).toBeGreaterThan(1500);
+    expect(w.rating).toBeLessThan(1750);
+  });
+
+  test("the prior vanishes with data: a 1-win lead shrinks as games pile up", () => {
+    // A model that's 1 game ahead on a tiny sample should rate far above its
+    // rival; the same +1 net on a large sample should be nearly even — the
+    // prior only disciplines small samples.
+    const small = bradleyTerry(["a", "b"], games("a", "b", 1), 0);
+    const large = bradleyTerry(
+      ["a", "b"],
+      [...games("a", "b", 201), ...games("b", "a", 200)],
+      0,
+    );
+    const gap = (r: ReturnType<typeof bradleyTerry>) =>
+      r.find((x) => x.id === "a")!.rating - r.find((x) => x.id === "b")!.rating;
+    expect(gap(small)).toBeGreaterThan(gap(large));
+  });
 });

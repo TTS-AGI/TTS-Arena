@@ -99,6 +99,8 @@ export const leaderboardRowSchema = z.object({
   icon: z.string().nullable(),
   /** Displayed rating: Glicko-2 while preliminary, Bradley–Terry once established. */
   elo: z.number().int(),
+  /** ± uncertainty on the rating (≈2·RD for Glicko, half the BT CI width). */
+  uncertainty: z.number().int(),
   winRate: z.number(), // 0–100
   totalVotes: z.number().int(),
   tier: z.enum(["S", "A", "B"]).nullable(),

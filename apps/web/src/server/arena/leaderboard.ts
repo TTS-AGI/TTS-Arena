@@ -1,17 +1,23 @@
 /**
- * Leaderboard assembly — a hybrid of two rating systems, each used where it's
- * strongest:
+ * Leaderboard assembly.
  *
- *   - < ESTABLISHED_THRESHOLD counted votes → live Glicko-2 (stable when data
- *     is sparse), shown as "preliminary".
- *   - >= ESTABLISHED_THRESHOLD               → the Bradley–Terry fit (the
- *     principled global ranking once there's enough data), cached.
+ * Every ranked model is placed by the SAME Bradley–Terry fit — one calibrated
+ * global ranking over all pairwise outcomes, including low-data models. BT's
+ * bootstrap CI naturally widens when a model has few games, so we DISPLAY the
+ * point rating but RANK by the CI lower bound: a model can't top the board on a
+ * lucky small sample, it must be both good AND certain. The ± uncertainty is
+ * surfaced so the provisional→settled story shows.
  *
- * Both ratings are centered on ~1500, so the single list is sorted by the
- * displayed rating; preliminary rows are badged in the UI.
+ * We used to split the board — Glicko-2 below ESTABLISHED_THRESHOLD votes, BT
+ * above — but that put two uncalibrated scales on one list, producing jarring
+ * gaps (a 216-vote model's Glicko number sitting well above the BT numbers it
+ * was listed against). One BT fit for everyone removes that seam. Glicko's live
+ * rating/RD is kept only as a fallback if BT is somehow missing a model, and the
+ * `preliminary` flag still badges models under the establishment threshold.
  */
 import { eq } from "drizzle-orm";
 import {
+  conservativeRating,
   isEstablished,
   isRanked,
   tierFor,
@@ -24,45 +30,66 @@ import { getBTRatings } from "./bt-cache";
 
 export async function getLeaderboard(
   type: ModelType,
+  includePreliminary = false,
 ): Promise<LeaderboardRow[]> {
   const [typeModels, bt] = await Promise.all([
     db.select().from(models).where(eq(models.modelType, type)),
     getBTRatings(type),
   ]);
 
-  // Build each row from the appropriate rating source. Only models with enough
-  // counted matches are ranked — below RANK_THRESHOLD the rating is too noisy
-  // (a handful of votes can swing it wildly), so they're hidden until they earn
-  // more.
-  const rows = typeModels
-    .filter((m) => isRanked(m.matchCount))
-    .map((m) => {
-      const established = isEstablished(m.matchCount);
-      const btRating = bt.get(m.id)?.rating;
-      // Established models use BT (fall back to Glicko if BT is somehow
-      // missing); preliminary models always use their live Glicko rating.
-      const rating =
-        established && btRating !== undefined ? btRating : m.rating;
-      return {
-        id: m.id,
-        name: m.name,
-        url: m.url ?? "",
-        icon: m.icon ?? null,
-        elo: Math.round(rating),
-        winRate: m.matchCount > 0 ? (m.winCount / m.matchCount) * 100 : 0,
-        totalVotes: m.matchCount,
-        open: m.isOpen,
-        preliminary: !established,
-        active: m.isActive,
-      };
-    });
+  // By default, only models past RANK_THRESHOLD votes are shown — below it the
+  // rating is too noisy to be meaningful. When includePreliminary is set (the
+  // "show new models" toggle), the floor drops to any model with at least one
+  // counted match, so freshly-added models are discoverable right away (still
+  // badged "Preliminary" until they cross the establishment threshold).
+  const floor = (m: (typeof typeModels)[number]) =>
+    includePreliminary ? m.matchCount > 0 : isRanked(m.matchCount);
+  const rows = typeModels.filter(floor).map((m) => {
+    const btr = bt.get(m.id);
 
-  // One list, sorted by the displayed rating.
-  rows.sort((a, b) => b.elo - a.elo);
+    // Display rating + ranking lower bound + ± uncertainty. Prefer the single
+    // BT fit for everyone (rank by its CI lower bound); fall back to live
+    // Glicko (rating − 2·RD) only if BT somehow lacks this model.
+    let rating: number;
+    let lowerBound: number;
+    let uncertainty: number;
+    if (btr !== undefined) {
+      rating = btr.rating;
+      lowerBound = btr.ciLow;
+      uncertainty = Math.round((btr.ciHigh - btr.ciLow) / 2);
+    } else {
+      rating = m.rating;
+      lowerBound = conservativeRating({
+        rating: m.rating,
+        rd: m.ratingDeviation,
+        vol: m.volatility,
+      });
+      uncertainty = Math.round(2 * m.ratingDeviation);
+    }
 
-  return rows.map((r, i) => ({
-    rank: i + 1,
-    tier: tierFor(i + 1),
-    ...r,
-  }));
+    return {
+      id: m.id,
+      name: m.name,
+      url: m.url ?? "",
+      icon: m.icon ?? null,
+      elo: Math.round(rating),
+      lowerBound,
+      uncertainty,
+      winRate: m.matchCount > 0 ? (m.winCount / m.matchCount) * 100 : 0,
+      totalVotes: m.matchCount,
+      open: m.isOpen,
+      preliminary: !isEstablished(m.matchCount),
+      active: m.isActive,
+    };
+  });
+
+  // Rank by the conservative lower bound (good AND certain), then strip it —
+  // it's an internal sort key, not part of the public row.
+  rows.sort((a, b) => b.lowerBound - a.lowerBound);
+
+  return rows.map((row, i) => {
+    const { lowerBound, ...r } = row;
+    void lowerBound;
+    return { rank: i + 1, tier: tierFor(i + 1), ...r };
+  });
 }

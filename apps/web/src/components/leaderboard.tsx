@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Checkbox } from "@base-ui-components/react/checkbox";
 import type { LeaderboardResponse, LeaderboardRow } from "@ttsa/shared";
 import { ModelLogo } from "./model-logo";
 import { StealthModal } from "./stealth-modal";
@@ -26,10 +27,18 @@ export function Leaderboard() {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState(false);
   const [stealthOpen, setStealthOpen] = useState(false);
+  // When on, the board also lists newly-added models that haven't yet earned
+  // enough votes to be ranked normally (badged "Preliminary").
+  const [showPreliminary, setShowPreliminary] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/leaderboard?type=tts")
+    setRows(null);
+    setError(false);
+    const url = showPreliminary
+      ? "/api/leaderboard?type=tts&preliminary=1"
+      : "/api/leaderboard?type=tts";
+    fetch(url)
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json() as Promise<LeaderboardResponse>;
@@ -39,7 +48,7 @@ export function Leaderboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [showPreliminary]);
 
   const sorted = useMemo(() => {
     if (!rows) return [];
@@ -59,8 +68,8 @@ export function Leaderboard() {
           Leaderboard
         </h1>
         <p className="mt-2 text-ink-2">
-          Ratings from blind pairwise votes. New models appear quickly and
-          settle as the votes pile up.
+          Ratings from blind pairwise votes. Ratings settle as the votes pile
+          up; newer models join once they’ve earned enough.
         </p>
       </div>
 
@@ -84,6 +93,30 @@ export function Leaderboard() {
             );
           })}
         </div>
+      </div>
+
+      {/* Show-preliminary toggle */}
+      <div className="flex justify-center">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-2 select-none">
+          <Checkbox.Root
+            checked={showPreliminary}
+            onCheckedChange={setShowPreliminary}
+            className="grid h-4.5 w-4.5 place-items-center rounded-[0.3rem] border border-line bg-surface transition-colors data-[checked]:border-accent data-[checked]:bg-accent"
+          >
+            <Checkbox.Indicator className="text-white">
+              <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none">
+                <path
+                  d="M2.5 6.2 4.8 8.5 9.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Checkbox.Indicator>
+          </Checkbox.Root>
+          Show new models with few votes
+        </label>
       </div>
 
       {error ? (
@@ -180,6 +213,14 @@ function Row({
                 {model.name}
               </span>
             )}
+            {model.preliminary && model.active && (
+              <span
+                className="shrink-0 rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.7rem] font-medium text-accent"
+                title="Preliminary — fewer than 300 votes, so this rating is still settling and may move as more votes come in."
+              >
+                Preliminary
+              </span>
+            )}
             {!model.active && (
               <span
                 className="shrink-0 rounded-full border border-line bg-sunk px-2 py-0.5 text-[0.7rem] font-medium text-ink-3"
@@ -202,6 +243,11 @@ function Row({
           }`}
         >
           {value}
+          {sort === "elo" && (
+            <span className="ml-1 text-xs font-normal text-ink-4">
+              ±{model.uncertainty}
+            </span>
+          )}
         </p>
         <p className="tag mt-0.5">{valueLabel}</p>
       </div>
