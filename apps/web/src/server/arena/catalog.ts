@@ -5,7 +5,7 @@
  */
 import { routerModelsResponseSchema, type ArenaModelDTO } from "@ttsa/shared";
 import { serverEnv } from "../env";
-import { db, withWriteRetry } from "../db/client";
+import { db } from "../db/client";
 import { models as modelsTable } from "../db/schema";
 import { logErrorEvent } from "../observability/errors";
 
@@ -73,35 +73,33 @@ export async function getCatalogModel(
  */
 export async function ensureModelsSeeded(dtos: ArenaModelDTO[]): Promise<void> {
   if (dtos.length === 0) return;
-  await withWriteRetry(() =>
-    db.transaction((tx) => {
-      for (const m of dtos) {
-        tx.insert(modelsTable)
-          .values({
-            id: m.id,
+  await db.transaction(async (tx) => {
+    for (const m of dtos) {
+      await tx
+        .insert(modelsTable)
+        .values({
+          id: m.id,
+          name: m.name,
+          modelType: "tts",
+          provider: m.provider,
+          isOpen: m.open,
+          isActive: m.enabled,
+          url: m.url,
+          icon: m.icon ?? null,
+        })
+        .onConflictDoUpdate({
+          target: modelsTable.id,
+          // Refresh display metadata only — never reset rating/counts, and
+          // don't touch isActive (admin-controlled) or timedOutUntil.
+          set: {
             name: m.name,
-            modelType: "tts",
             provider: m.provider,
             isOpen: m.open,
-            isActive: m.enabled,
             url: m.url,
             icon: m.icon ?? null,
-          })
-          .onConflictDoUpdate({
-            target: modelsTable.id,
-            // Refresh display metadata only — never reset rating/counts, and
-            // don't touch isActive (admin-controlled) or timedOutUntil.
-            set: {
-              name: m.name,
-              provider: m.provider,
-              isOpen: m.open,
-              url: m.url,
-              icon: m.icon ?? null,
-              updatedAt: new Date(),
-            },
-          })
-          .run();
-      }
-    }),
-  );
+            updatedAt: new Date(),
+          },
+        });
+    }
+  });
 }

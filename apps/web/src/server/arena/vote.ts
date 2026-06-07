@@ -8,7 +8,7 @@
  */
 import { eq, sql } from "drizzle-orm";
 import { glickoUpdate, type Glicko } from "@ttsa/shared";
-import { db, withWriteRetry } from "../db/client";
+import { db } from "../db/client";
 import {
   battleSessions,
   models,
@@ -53,116 +53,107 @@ export async function recordVote(
     ? JSON.stringify(assessment.reasons)
     : null;
 
-  // The SQLite driver (bun:sqlite / better-sqlite3) is synchronous, so the
-  // transaction callback must be synchronous too — no `await` inside, or the
-  // driver throws ("custom formatter threw an exception"). All reads/writes
-  // here run synchronously via the sync query builders.
-  //
-  // Wrapped in withWriteRetry because bun:sqlite doesn't wait on a held write
-  // lock; the whole vote (mark-voted + rating updates) is one transaction so a
-  // retry re-runs atomically.
+  // One Postgres transaction: mark the session voted, persist the vote, and (if
+  // it counts) apply the live Glicko-2 update, append rating history, and bump
+  // per-voice stats. node-postgres transactions are async — every statement is
+  // awaited.
   let insertedVoteId = 0;
-  await withWriteRetry(() =>
-    db.transaction((tx) => {
-      // 0. Mark the session voted (idempotency guard lives in the same tx).
-      tx.update(battleSessions)
-        .set({ voted: true })
-        .where(eq(battleSessions.id, session.id))
-        .run();
+  await db.transaction(async (tx) => {
+    // 0. Mark the session voted (idempotency guard lives in the same tx).
+    await tx
+      .update(battleSessions)
+      .set({ voted: true })
+      .where(eq(battleSessions.id, session.id));
 
-      // 1. Persist the vote.
-      const [vote] = tx
-        .insert(votes)
-        .values({
-          userId: session.userId,
-          text: session.text,
-          modelType: session.modelType,
-          chosenModelId: chosenSide.modelId,
-          rejectedModelId: rejectedSide.modelId,
-          chosenVoice: chosenSide.voice,
-          rejectedVoice: rejectedSide.voice,
-          chosenAudioPath: chosenSide.logPath,
-          rejectedAudioPath: rejectedSide.logPath,
-          sentenceHash: session.sentenceHash,
-          sentenceOrigin: origin,
-          countsForPublic: counts,
-          riskScore,
-          riskReasons,
-          flagged,
-          sessionDurationSeconds: (Date.now() - session.createdAt) / 1000,
-        })
-        .returning({ id: votes.id })
-        .all();
-      const voteId = vote!.id;
-      insertedVoteId = voteId;
+    // 1. Persist the vote.
+    const [vote] = await tx
+      .insert(votes)
+      .values({
+        userId: session.userId,
+        text: session.text,
+        modelType: session.modelType,
+        chosenModelId: chosenSide.modelId,
+        rejectedModelId: rejectedSide.modelId,
+        chosenVoice: chosenSide.voice,
+        rejectedVoice: rejectedSide.voice,
+        chosenAudioPath: chosenSide.logPath,
+        rejectedAudioPath: rejectedSide.logPath,
+        sentenceHash: session.sentenceHash,
+        sentenceOrigin: origin,
+        countsForPublic: counts,
+        riskScore,
+        riskReasons,
+        flagged,
+        sessionDurationSeconds: (Date.now() - session.createdAt) / 1000,
+      })
+      .returning({ id: votes.id });
+    const voteId = vote!.id;
+    insertedVoteId = voteId;
 
-      if (!counts) return;
+    if (!counts) return;
 
-      // 2. Live Glicko-2 update for both models.
-      const chosenRow = tx.query.models
-        .findFirst({ where: eq(models.id, chosenSide.modelId) })
-        .sync();
-      const rejectedRow = tx.query.models
-        .findFirst({ where: eq(models.id, rejectedSide.modelId) })
-        .sync();
-      if (!chosenRow || !rejectedRow) return;
+    // 2. Live Glicko-2 update for both models.
+    const chosenRow = await tx.query.models.findFirst({
+      where: eq(models.id, chosenSide.modelId),
+    });
+    const rejectedRow = await tx.query.models.findFirst({
+      where: eq(models.id, rejectedSide.modelId),
+    });
+    if (!chosenRow || !rejectedRow) return;
 
-      const chosenBefore = glickoOf(chosenRow);
-      const rejectedBefore = glickoOf(rejectedRow);
-      const chosenAfter = glickoUpdate(chosenBefore, [
-        { opponent: rejectedBefore, score: 1 },
-      ]);
-      const rejectedAfter = glickoUpdate(rejectedBefore, [
-        { opponent: chosenBefore, score: 0 },
-      ]);
+    const chosenBefore = glickoOf(chosenRow);
+    const rejectedBefore = glickoOf(rejectedRow);
+    const chosenAfter = glickoUpdate(chosenBefore, [
+      { opponent: rejectedBefore, score: 1 },
+    ]);
+    const rejectedAfter = glickoUpdate(rejectedBefore, [
+      { opponent: chosenBefore, score: 0 },
+    ]);
 
-      tx.update(models)
-        .set({
-          rating: chosenAfter.rating,
-          ratingDeviation: chosenAfter.rd,
-          volatility: chosenAfter.vol,
-          winCount: chosenRow.winCount + 1,
-          matchCount: chosenRow.matchCount + 1,
-          updatedAt: new Date(),
-        })
-        .where(eq(models.id, chosenRow.id))
-        .run();
-      tx.update(models)
-        .set({
-          rating: rejectedAfter.rating,
-          ratingDeviation: rejectedAfter.rd,
-          volatility: rejectedAfter.vol,
-          matchCount: rejectedRow.matchCount + 1,
-          updatedAt: new Date(),
-        })
-        .where(eq(models.id, rejectedRow.id))
-        .run();
+    await tx
+      .update(models)
+      .set({
+        rating: chosenAfter.rating,
+        ratingDeviation: chosenAfter.rd,
+        volatility: chosenAfter.vol,
+        winCount: chosenRow.winCount + 1,
+        matchCount: chosenRow.matchCount + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(models.id, chosenRow.id));
+    await tx
+      .update(models)
+      .set({
+        rating: rejectedAfter.rating,
+        ratingDeviation: rejectedAfter.rd,
+        volatility: rejectedAfter.vol,
+        matchCount: rejectedRow.matchCount + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(models.id, rejectedRow.id));
 
-      // 3. Rating history trail.
-      tx.insert(ratingHistory)
-        .values([
-          {
-            modelId: chosenRow.id,
-            modelType: session.modelType,
-            rating: chosenAfter.rating,
-            ratingDeviation: chosenAfter.rd,
-            voteId,
-          },
-          {
-            modelId: rejectedRow.id,
-            modelType: session.modelType,
-            rating: rejectedAfter.rating,
-            ratingDeviation: rejectedAfter.rd,
-            voteId,
-          },
-        ])
-        .run();
+    // 3. Rating history trail.
+    await tx.insert(ratingHistory).values([
+      {
+        modelId: chosenRow.id,
+        modelType: session.modelType,
+        rating: chosenAfter.rating,
+        ratingDeviation: chosenAfter.rd,
+        voteId,
+      },
+      {
+        modelId: rejectedRow.id,
+        modelType: session.modelType,
+        rating: rejectedAfter.rating,
+        ratingDeviation: rejectedAfter.rd,
+        voteId,
+      },
+    ]);
 
-      // 4. Per-voice stats (win for chosen voice, match for both).
-      upsertVoiceStat(tx, chosenRow.id, chosenSide.voice, true);
-      upsertVoiceStat(tx, rejectedRow.id, rejectedSide.voice, false);
-    }),
-  );
+    // 4. Per-voice stats (win for chosen voice, match for both).
+    await upsertVoiceStat(tx, chosenRow.id, chosenSide.voice, true);
+    await upsertVoiceStat(tx, rejectedRow.id, rejectedSide.voice, false);
+  });
 
   // Record a security event for flagged/blocked votes (best-effort, async).
   if (flagged && assessment) {
@@ -183,14 +174,15 @@ export async function recordVote(
   };
 }
 
-/** Increment a (model, voice) stat row, creating it if needed (synchronous). */
-function upsertVoiceStat(
+/** Increment a (model, voice) stat row, creating it if needed. */
+async function upsertVoiceStat(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   modelId: string,
   voice: string,
   won: boolean,
-): void {
-  tx.insert(voiceStats)
+): Promise<void> {
+  await tx
+    .insert(voiceStats)
     .values({
       modelId,
       voice,
@@ -204,6 +196,5 @@ function upsertVoiceStat(
         matchCount: sql`${voiceStats.matchCount} + 1`,
         updatedAt: new Date(),
       },
-    })
-    .run();
+    });
 }

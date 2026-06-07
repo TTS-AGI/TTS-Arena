@@ -100,6 +100,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const signOut = useCallback(async () => {
+    // Actually clear the server session cookie — not just local state, or
+    // /api/auth/me logs the user straight back in on the next load.
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Even if the request fails, drop local state so the UI reflects intent.
+    }
     setUser(null);
   }, []);
 

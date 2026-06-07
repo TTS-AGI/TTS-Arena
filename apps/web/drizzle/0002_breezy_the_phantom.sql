@@ -1,1 +1,0 @@
-ALTER TABLE `battle_sessions` ADD `sentence_origin` text DEFAULT 'custom' NOT NULL;

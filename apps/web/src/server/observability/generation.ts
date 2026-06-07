@@ -24,21 +24,18 @@ export async function logGenerationEvent(e: {
 }): Promise<void> {
   try {
     await withWriteRetry(() =>
-      db
-        .insert(generationEvents)
-        .values({
-          provider: e.provider,
-          model: e.model,
-          routerModel: e.routerModel ?? null,
-          durationMs: Math.max(0, Math.round(e.durationMs)),
-          success: e.success,
-          audioBytes: e.audioBytes ?? 0,
-          textLength: e.textLength ?? null,
-          status: e.status ?? null,
-          error: e.error ? e.error.slice(0, MAX_ERROR) : null,
-          userId: e.userId ?? null,
-        })
-        .run(),
+      db.insert(generationEvents).values({
+        provider: e.provider,
+        model: e.model,
+        routerModel: e.routerModel ?? null,
+        durationMs: Math.max(0, Math.round(e.durationMs)),
+        success: e.success,
+        audioBytes: e.audioBytes ?? 0,
+        textLength: e.textLength ?? null,
+        status: e.status ?? null,
+        error: e.error ? e.error.slice(0, MAX_ERROR) : null,
+        userId: e.userId ?? null,
+      }),
     );
   } catch {
     // Non-critical — never let timing logging break a generation.
@@ -77,17 +74,14 @@ export async function pruneGenerationEvents(): Promise<number> {
       const ids = oldest.map((r) => r.id);
       if (ids.length) {
         await withWriteRetry(() =>
-          db
-            .delete(generationEvents)
-            .where(
-              and(
-                sql`${generationEvents.id} in (${sql.join(
-                  ids.map((i) => sql`${i}`),
-                  sql`, `,
-                )})`,
-              ),
-            )
-            .run(),
+          db.delete(generationEvents).where(
+            and(
+              sql`${generationEvents.id} in (${sql.join(
+                ids.map((i) => sql`${i}`),
+                sql`, `,
+              )})`,
+            ),
+          ),
         );
         removed += ids.length;
       }

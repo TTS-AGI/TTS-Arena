@@ -1,86 +1,96 @@
 /**
- * Database client (SQLite + Drizzle). Lazily initialized so importing this
- * module during `next build` doesn't open the file. The DB lives at SQLITE_PATH
- * (the /data persistent bucket on the Space; a local file in dev) — a single
- * file the bucket can store reliably, unlike a Postgres dir.
+ * Database client (Postgres + Drizzle). Lazily initialized so importing this
+ * module during `next build` doesn't open a connection. The DB lives at
+ * DATABASE_URL — a Postgres server (on a VPS in production, reached directly
+ * over TLS on the public internet; a local container in dev).
  *
- * Driver is chosen by runtime:
- *   - Bun (the Space's web server + router, and `bun run`): the built-in
- *     `bun:sqlite`, which needs no native module. better-sqlite3's prebuilt
- *     binary is compiled against Node's V8 ABI and crashes under Bun with
- *     "undefined symbol: _ZN2v8...".
- *   - Node (Next.js `next dev`/`next build`, drizzle-kit): `better-sqlite3`.
+ * We moved off SQLite: a single SQLite file on HF's network-backed bucket kept
+ * corrupting ("database disk image is malformed") because bun:sqlite's locking
+ * is unreliable on a network filesystem. Postgres is a real networked DB with
+ * proper concurrency, so the per-write retry / journal-mode workarounds are gone.
  */
-import { dirname, resolve } from "node:path";
-import { mkdirSync } from "node:fs";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool, types } from "pg";
 import * as schema from "./schema";
 
-// Drizzle's bun-sqlite and better-sqlite3 drivers expose an identical query API
-// over our schema, so we type the client as one concrete driver. This keeps
-// every call site (db.select/insert/...) correctly typed; the actual driver is
-// chosen at runtime below.
-type DrizzleDb = BetterSQLite3Database<typeof schema>;
+// pg returns bigint (int8, OID 20) and numeric (OID 1700) as STRINGS by
+// default. Our queries use count(*)/sum() and expect plain numbers, so parse
+// them as JS numbers. Counts here are tiny (well within Number.MAX_SAFE_INTEGER).
+types.setTypeParser(20, (v) => (v === null ? null : Number(v)));
+types.setTypeParser(1700, (v) => (v === null ? null : Number(v)));
+
+type DrizzleDb = NodePgDatabase<typeof schema>;
 
 const globalForDb = globalThis as unknown as {
   __ttsaDb?: DrizzleDb;
+  __ttsaPool?: Pool;
 };
 
-const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== "undefined";
+function connectionString(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL is not set — a Postgres connection string is required.",
+    );
+  }
+  return url;
+}
 
-function dbPath(): string {
-  return resolve(
-    process.env.SQLITE_PATH ?? process.env.DATABASE_URL ?? "./tts_arena.db",
-  );
+/**
+ * Build the connection options for a pg Pool from DATABASE_URL.
+ *
+ * The VPS Postgres uses a self-signed cert, so we must encrypt the connection
+ * but NOT verify the CA chain. The catch: as of pg 8.21 / pg-connection-string
+ * 2.13, a `sslmode=require` in the URL is parsed by pg-connection-string into
+ * its OWN ssl config and treated as `verify-full` — which rejects a self-signed
+ * cert and OVERRIDES the explicit `ssl` option we pass. (It "CONNECT_FAIL: self
+ * signed certificate" even with ssl.rejectUnauthorized=false.)
+ *
+ * So we strip `sslmode` from the URL ourselves and pass `ssl` purely as an
+ * explicit option object — that's the only combination pg honors for a
+ * self-signed cert. `sslmode=require`/`prefer`/`no-verify` in the URL (or
+ * PGSSL_NO_VERIFY=1) still selects "encrypt without verifying the CA".
+ */
+export function poolConfig(url: string): {
+  connectionString: string;
+  ssl: false | { rejectUnauthorized: boolean };
+} {
+  const wantsSsl =
+    /sslmode=(require|prefer|no-verify)/.test(url) ||
+    process.env.PGSSL_NO_VERIFY === "1";
+  // Remove any sslmode param so pg-connection-string doesn't impose verify-full.
+  const cleanUrl = url
+    .replace(/([?&])sslmode=[^&]*(&|$)/, (_m, p1, p2) => (p2 === "&" ? p1 : ""))
+    .replace(/[?&]$/, "");
+  return {
+    connectionString: cleanUrl,
+    ssl: wantsSsl ? { rejectUnauthorized: false } : false,
+  };
 }
 
 function init(): DrizzleDb {
   if (globalForDb.__ttsaDb) return globalForDb.__ttsaDb;
-  const path = dbPath();
-  mkdirSync(dirname(path), { recursive: true });
-
-  let instance: DrizzleDb;
-  if (isBun) {
-    // `bun:sqlite` + drizzle's bun-sqlite driver. Typed loosely because the Bun
-    // module types aren't available in the Node typecheck/build; the runtime
-    // query API is identical to better-sqlite3, so we cast to DrizzleDb.
-    /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
-    const { Database } = require("bun:sqlite");
-    const { drizzle } = require("drizzle-orm/bun-sqlite");
-    const sqlite = new Database(path);
-    // NOT WAL. The DB lives on HF's network-backed persistent bucket, where
-    // WAL's mmap'd -shm/-wal sidecars get out of sync and trigger "database
-    // disk image is malformed". A rollback journal (DELETE) uses a single
-    // sidecar that's atomically removed on commit — robust on networked FS.
-    sqlite.exec("PRAGMA journal_mode = DELETE;");
-    sqlite.exec("PRAGMA synchronous = FULL;");
-    sqlite.exec("PRAGMA foreign_keys = ON;");
-    sqlite.exec("PRAGMA busy_timeout = 15000;");
-    instance = drizzle(sqlite, { schema }) as any;
-    /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any */
-  } else {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const Database =
-      require("better-sqlite3") as typeof import("better-sqlite3");
-    const { drizzle } =
-      require("drizzle-orm/better-sqlite3") as typeof import("drizzle-orm/better-sqlite3");
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    const sqlite = new Database(path);
-    // See the bun branch above — DELETE journal, not WAL, for networked storage.
-    sqlite.pragma("journal_mode = DELETE");
-    sqlite.pragma("synchronous = FULL");
-    sqlite.pragma("foreign_keys = ON");
-    sqlite.pragma("busy_timeout = 15000");
-    instance = drizzle(sqlite, { schema });
-  }
-
+  const url = connectionString();
+  const pool = new Pool({
+    ...poolConfig(url),
+    // Modest pool — the web server is the only writer and traffic is light.
+    max: Number(process.env.DB_POOL_MAX ?? 10),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+  });
+  // Surface pool-level errors instead of crashing the process.
+  pool.on("error", (err) => {
+    console.error("[db] pool error:", err.message);
+  });
+  const instance = drizzle(pool, { schema });
+  globalForDb.__ttsaPool = pool;
   globalForDb.__ttsaDb = instance;
   return instance;
 }
 
 /**
  * Proxy that initializes the real Drizzle client on first property access, so
- * callers use `db` exactly as before.
+ * callers use `db` exactly as before (and `next build` doesn't connect).
  */
 export const db: DrizzleDb = new Proxy({} as DrizzleDb, {
   get(_target, prop) {
@@ -92,35 +102,11 @@ export const db: DrizzleDb = new Proxy({} as DrizzleDb, {
 
 export type DB = typeof db;
 
-function isLockedError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return /database is locked|SQLITE_BUSY/i.test(msg);
-}
-
 /**
- * Run a DB write, retrying on "database is locked".
- *
- * bun:sqlite does NOT honor `busy_timeout` for write transactions — a second
- * writer fails immediately instead of waiting. So when the periodic cleanup
- * sweep (or a concurrent request) holds the write lock, an un-retried write
- * throws and the request 500s. This wrapper retries with small randomized
- * backoff so contended writes wait their turn instead of failing.
- *
- * The callback should be self-contained (use the driver's transaction for
- * multi-statement writes) so a retry re-runs cleanly.
+ * Run a DB write. Kept as a thin wrapper for call-site compatibility — under
+ * SQLite this retried on "database is locked", which Postgres doesn't need
+ * (proper row/table locking + MVCC). It now just runs the callback.
  */
-export async function withWriteRetry<T>(
-  fn: () => T | Promise<T>,
-  tries = 12,
-): Promise<T> {
-  for (let attempt = 0; attempt < tries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (!isLockedError(err) || attempt === tries - 1) throw err;
-      const backoff = 8 * (attempt + 1) * (1 + Math.random());
-      await new Promise((r) => setTimeout(r, backoff));
-    }
-  }
-  throw new Error("withWriteRetry: exhausted retries");
+export async function withWriteRetry<T>(fn: () => T | Promise<T>): Promise<T> {
+  return await fn();
 }

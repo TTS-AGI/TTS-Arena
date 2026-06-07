@@ -54,8 +54,7 @@ async function flagVotes(voteIds: number[], reason: FlagReason): Promise<void> {
         countsForPublic: false,
         riskReasons: JSON.stringify([reason.kind]),
       })
-      .where(inArray(votes.id, voteIds))
-      .run(),
+      .where(inArray(votes.id, voteIds)),
   );
 }
 
@@ -153,8 +152,7 @@ async function sweepClusters(sinceMs: number): Promise<number> {
           db
             .update(users)
             .set({ trustScore: sql`max(0, ${users.trustScore} - 30)` })
-            .where(inArray(users.id, accountIds))
-            .run(),
+            .where(inArray(users.id, accountIds)),
         );
       }
     }
@@ -233,8 +231,7 @@ async function sweepBias(sinceMs: number): Promise<number> {
         db
           .update(users)
           .set({ trustScore: sql`max(0, ${users.trustScore} - 40)` })
-          .where(eq(users.id, u.userId))
-          .run(),
+          .where(eq(users.id, u.userId)),
       );
       await logSecurityEvent({
         kind: "choice_bias",
@@ -265,11 +262,7 @@ async function sweepQuarantine(): Promise<number> {
     );
   for (const u of toQuarantine) {
     await withWriteRetry(() =>
-      db
-        .update(users)
-        .set({ quarantined: true })
-        .where(eq(users.id, u.id))
-        .run(),
+      db.update(users).set({ quarantined: true }).where(eq(users.id, u.id)),
     );
     await logSecurityEvent({
       kind: "auto_quarantine",

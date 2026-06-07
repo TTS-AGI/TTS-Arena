@@ -59,5 +59,15 @@ export async function readSession(): Promise<number | null> {
 
 export async function destroySession(): Promise<void> {
   const store = await cookies();
+  // Overwrite with an expired cookie carrying the SAME attributes it was set
+  // with. A bare delete(name) doesn't reliably clear a SameSite=None; Secure
+  // cookie (as used in the HF iframe) — the browser needs a matching Set-Cookie.
+  store.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    ...cookieSecurity(),
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  });
   store.delete(COOKIE_NAME);
 }

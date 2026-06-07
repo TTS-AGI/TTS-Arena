@@ -36,8 +36,8 @@
     "@ttsa/provider-typecast": "workspace:*",
     "@ttsa/provider-voiceai": "workspace:*",
     "@ttsa/shared": "workspace:*",
-    "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.38.3",
+    "pg": "^8.13.1",
     "jose": "^5.9.6",
     "lucide-react": "^1.17.0",
     "motion": "^11.15.0",
@@ -50,7 +50,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/pg": "^8.11.10",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "drizzle-kit": "^0.30.1",

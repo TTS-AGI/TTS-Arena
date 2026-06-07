@@ -84,28 +84,25 @@ export async function createSession(input: {
   ]);
 
   await withWriteRetry(() =>
-    db
-      .insert(battleSessions)
-      .values({
-        id,
-        userId: input.userId,
-        modelType: input.modelType,
-        text: input.text,
-        sentenceHash: input.sentenceHash,
-        sentenceOrigin: input.origin,
-        aModelId: input.a.modelId,
-        aVoice: input.a.voice,
-        aPath,
-        aExt: input.a.extension,
-        aLogPath,
-        bModelId: input.b.modelId,
-        bVoice: input.b.voice,
-        bPath,
-        bExt: input.b.extension,
-        bLogPath,
-        expiresAt: expires,
-      })
-      .run(),
+    db.insert(battleSessions).values({
+      id,
+      userId: input.userId,
+      modelType: input.modelType,
+      text: input.text,
+      sentenceHash: input.sentenceHash,
+      sentenceOrigin: input.origin,
+      aModelId: input.a.modelId,
+      aVoice: input.a.voice,
+      aPath,
+      aExt: input.a.extension,
+      aLogPath,
+      bModelId: input.b.modelId,
+      bVoice: input.b.voice,
+      bPath,
+      bExt: input.b.extension,
+      bLogPath,
+      expiresAt: expires,
+    }),
   );
 
   return {
@@ -196,7 +193,7 @@ export async function deleteSession(id: string): Promise<void> {
 async function purge(id: string, paths: string[]): Promise<void> {
   await deleteAudio(paths);
   await withWriteRetry(() =>
-    db.delete(battleSessions).where(eq(battleSessions.id, id)).run(),
+    db.delete(battleSessions).where(eq(battleSessions.id, id)),
   );
 }
 

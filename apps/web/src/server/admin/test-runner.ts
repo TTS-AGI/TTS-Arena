@@ -69,18 +69,15 @@ export async function startTestRun(startedBy?: string): Promise<number> {
 
   if (catalog.length > 0) {
     await withWriteRetry(() =>
-      db
-        .insert(testResults)
-        .values(
-          catalog.map((m) => ({
-            runId,
-            model: m.id,
-            modelName: m.name,
-            provider: m.provider,
-            status: "pending" as const,
-          })),
-        )
-        .run(),
+      db.insert(testResults).values(
+        catalog.map((m) => ({
+          runId,
+          model: m.id,
+          modelName: m.name,
+          provider: m.provider,
+          status: "pending" as const,
+        })),
+      ),
     );
   }
 
@@ -100,8 +97,7 @@ async function runOne(runId: number, resultId: number): Promise<boolean> {
     db
       .update(testResults)
       .set({ status: "running", updatedAt: new Date() })
-      .where(eq(testResults.id, resultId))
-      .run(),
+      .where(eq(testResults.id, resultId)),
   );
 
   // We need the provider + routerModel; resolve from the live catalog.
@@ -130,8 +126,7 @@ async function runOne(runId: number, resultId: number): Promise<boolean> {
           error: null,
           updatedAt: new Date(),
         })
-        .where(eq(testResults.id, resultId))
-        .run(),
+        .where(eq(testResults.id, resultId)),
     );
     return true;
   } catch (err) {
@@ -144,8 +139,7 @@ async function runOne(runId: number, resultId: number): Promise<boolean> {
           error: errInfo(err).message.slice(0, 1000),
           updatedAt: new Date(),
         })
-        .where(eq(testResults.id, resultId))
-        .run(),
+        .where(eq(testResults.id, resultId)),
     );
     return false;
   }
@@ -163,8 +157,7 @@ async function drainRun(runId: number): Promise<void> {
         .set({ status: "pending" })
         .where(
           and(eq(testResults.runId, runId), eq(testResults.status, "running")),
-        )
-        .run(),
+        ),
     );
 
     for (;;) {
@@ -199,8 +192,7 @@ async function refreshRunCounts(runId: number): Promise<void> {
     db
       .update(testRuns)
       .set({ completed: passed + failed, passed, failed })
-      .where(eq(testRuns.id, runId))
-      .run(),
+      .where(eq(testRuns.id, runId)),
   );
 }
 
@@ -210,8 +202,7 @@ async function finalizeRun(runId: number): Promise<void> {
     db
       .update(testRuns)
       .set({ status: "done", finishedAt: new Date() })
-      .where(eq(testRuns.id, runId))
-      .run(),
+      .where(eq(testRuns.id, runId)),
   );
 }
 

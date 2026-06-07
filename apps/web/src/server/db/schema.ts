@@ -1,58 +1,55 @@
 /**
- * Database schema (Drizzle, SQLite).
+ * Database schema (Drizzle, Postgres).
  *
- * Models the TTS arena cleanly: users, models with live Glicko-2 ratings,
- * votes, a rating-history trail, per-voice stats, single-use sentences, and
- * battle sessions. The old security/anti-abuse tables are intentionally
- * omitted.
+ * Models the TTS arena: users, models with live Glicko-2 ratings, votes, a
+ * rating-history trail, per-voice stats, single-use sentences, battle sessions,
+ * and the anti-fraud / observability tables.
  *
- * SQLite is used so the database is a single file the HF persistent bucket can
- * store reliably (Postgres' data dir didn't survive the bucket sync).
- * Booleans are stored as integers; timestamps as unix-epoch integers.
+ * Postgres (on a VPS, reached over a Cloudflare tunnel) replaced SQLite — a
+ * single SQLite file on HF's network bucket kept corrupting. Booleans are real
+ * booleans; timestamps are `timestamp` columns defaulting to now().
  */
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
+  bigint,
+  boolean,
+  doublePrecision,
   index,
   integer,
-  real,
-  sqliteTable,
+  pgTable,
+  serial,
   text,
+  timestamp,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
-
-const now = sql`(unixepoch())`;
+} from "drizzle-orm/pg-core";
 
 /* ── Users ────────────────────────────────────────────────────────────── */
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   /** Hugging Face account id (stable across username changes). */
   hfId: text("hf_id").notNull().unique(),
-  joinDate: integer("join_date", { mode: "timestamp" }).notNull().default(now),
+  joinDate: timestamp("join_date").notNull().defaultNow(),
   /** HF account creation date, used for the sign-in age gate. */
-  hfAccountCreated: integer("hf_account_created", { mode: "timestamp" }),
+  hfAccountCreated: timestamp("hf_account_created"),
   /** Email from the HF `email` OAuth scope (logged, not displayed). */
   email: text("email"),
   /** Absolute HF avatar URL. */
   avatarUrl: text("avatar_url"),
-  showInLeaderboard: integer("show_in_leaderboard", { mode: "boolean" })
-    .notNull()
-    .default(true),
+  showInLeaderboard: boolean("show_in_leaderboard").notNull().default(true),
 
   // ── Anti-fraud ──
   /** Trust score 0–100 (100 = fully trusted); lowered by the security sweep. */
-  trustScore: real("trust_score").notNull().default(100),
+  trustScore: doublePrecision("trust_score").notNull().default(100),
   /** When true, none of the user's votes count toward public ratings. */
-  quarantined: integer("quarantined", { mode: "boolean" })
-    .notNull()
-    .default(false),
+  quarantined: boolean("quarantined").notNull().default(false),
 });
 
 /* ── User logins (full history for abuse investigation) ───────────────── */
-export const userLogins = sqliteTable(
+export const userLogins = pgTable(
   "user_logins",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -61,9 +58,7 @@ export const userLogins = sqliteTable(
     userAgent: text("user_agent"),
     /** FingerprintJS visitor id supplied by the client. */
     fingerprint: text("fingerprint"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byUser: index("user_logins_user_idx").on(t.userId),
@@ -73,7 +68,7 @@ export const userLogins = sqliteTable(
 );
 
 /* ── Models ───────────────────────────────────────────────────────────── */
-export const models = sqliteTable("models", {
+export const models = pgTable("models", {
   /** Arena slug, e.g. "eleven-multilingual-v2". Matches @ttsa/shared MODELS. */
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -81,40 +76,38 @@ export const models = sqliteTable("models", {
   modelType: text("model_type").notNull(),
   /** Provider id (from the router catalog), for grouping/filtering in admin. */
   provider: text("provider"),
-  isOpen: integer("is_open", { mode: "boolean" }).notNull().default(false),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  isOpen: boolean("is_open").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
   /**
    * Temporary time-out: if set and in the future, the model is suppressed from
    * battles until then (e.g. an admin times out a failing model for a few
    * hours). Distinct from isActive, which is a manual on/off the admin controls.
    */
-  timedOutUntil: integer("timed_out_until", { mode: "timestamp" }),
+  timedOutUntil: timestamp("timed_out_until"),
   url: text("url"),
   /** Optional provider logo URL shown on the leaderboard. */
   icon: text("icon"),
 
   // ── Live Glicko-2 state ──
   /** Display rating (Glicko-2, centered on 1500). */
-  rating: real("rating").notNull().default(1500),
+  rating: doublePrecision("rating").notNull().default(1500),
   /** Rating deviation — uncertainty; high until enough games are played. */
-  ratingDeviation: real("rating_deviation").notNull().default(350),
+  ratingDeviation: doublePrecision("rating_deviation").notNull().default(350),
   /** Volatility — expected fluctuation in performance. */
-  volatility: real("volatility").notNull().default(0.06),
+  volatility: doublePrecision("volatility").notNull().default(0.06),
 
   // ── Denormalized counters (cheap reads; derived from votes) ──
   winCount: integer("win_count").notNull().default(0),
   matchCount: integer("match_count").notNull().default(0),
 
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .default(now),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 /* ── Votes ────────────────────────────────────────────────────────────── */
-export const votes = sqliteTable(
+export const votes = pgTable(
   "votes",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     userId: integer("user_id")
       .notNull()
       .references(() => users.id),
@@ -144,23 +137,19 @@ export const votes = sqliteTable(
     /** "dataset" | "custom". */
     sentenceOrigin: text("sentence_origin").notNull(),
     /** Whether this vote affects public ratings (the anti-fraud gate). */
-    countsForPublic: integer("counts_for_public", { mode: "boolean" })
-      .notNull()
-      .default(true),
+    countsForPublic: boolean("counts_for_public").notNull().default(true),
 
     // ── Anti-fraud audit trail ──
     /** Risk score assigned at vote time (0 = clean; higher = more suspicious). */
-    riskScore: real("risk_score").notNull().default(0),
+    riskScore: doublePrecision("risk_score").notNull().default(0),
     /** JSON array of reason codes that contributed to the risk score. */
     riskReasons: text("risk_reasons"),
     /** True if flagged as suspicious (inline or by the sweep). */
-    flagged: integer("flagged", { mode: "boolean" }).notNull().default(false),
+    flagged: boolean("flagged").notNull().default(false),
 
     /** Seconds between generation and vote (engagement signal). */
-    sessionDurationSeconds: real("session_duration_seconds"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    sessionDurationSeconds: doublePrecision("session_duration_seconds"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byUser: index("votes_user_idx").on(t.userId),
@@ -175,20 +164,18 @@ export const votes = sqliteTable(
 );
 
 /* ── Rating history ───────────────────────────────────────────────────── */
-export const ratingHistory = sqliteTable(
+export const ratingHistory = pgTable(
   "rating_history",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     modelId: text("model_id")
       .notNull()
       .references(() => models.id),
     modelType: text("model_type").notNull(),
-    rating: real("rating").notNull(),
-    ratingDeviation: real("rating_deviation").notNull(),
+    rating: doublePrecision("rating").notNull(),
+    ratingDeviation: doublePrecision("rating_deviation").notNull(),
     voteId: integer("vote_id").references(() => votes.id),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byModel: index("rating_history_model_idx").on(t.modelId),
@@ -197,19 +184,17 @@ export const ratingHistory = sqliteTable(
 );
 
 /* ── Per-voice stats ──────────────────────────────────────────────────── */
-export const voiceStats = sqliteTable(
+export const voiceStats = pgTable(
   "voice_stats",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     modelId: text("model_id")
       .notNull()
       .references(() => models.id),
     voice: text("voice").notNull(),
     winCount: integer("win_count").notNull().default(0),
     matchCount: integer("match_count").notNull().default(0),
-    updatedAt: integer("updated_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
     uniqModelVoice: uniqueIndex("voice_stats_model_voice_idx").on(
@@ -220,17 +205,15 @@ export const voiceStats = sqliteTable(
 );
 
 /* ── Consumed sentences (single-use dataset prompts) ──────────────────── */
-export const consumedSentences = sqliteTable("consumed_sentences", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const consumedSentences = pgTable("consumed_sentences", {
+  id: serial("id").primaryKey(),
   sentenceHash: text("sentence_hash").notNull().unique(),
   sentenceText: text("sentence_text").notNull(),
-  consumedAt: integer("consumed_at", { mode: "timestamp" })
-    .notNull()
-    .default(now),
+  consumedAt: timestamp("consumed_at").notNull().defaultNow(),
 });
 
 /* ── Battle sessions ──────────────────────────────────────────────────── */
-export const battleSessions = sqliteTable(
+export const battleSessions = pgTable(
   "battle_sessions",
   {
     /** Opaque session id (uuid) handed to the client. */
@@ -256,11 +239,9 @@ export const battleSessions = sqliteTable(
     bExt: text("b_ext").notNull(),
     bLogPath: text("b_log_path"),
 
-    voted: integer("voted", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
-    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    voted: boolean("voted").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at").notNull(),
   },
   (t) => ({
     byExpiry: index("battle_sessions_expiry_idx").on(t.expiresAt),
@@ -268,10 +249,10 @@ export const battleSessions = sqliteTable(
 );
 
 /* ── Security events (anti-fraud audit feed) ──────────────────────────── */
-export const securityEvents = sqliteTable(
+export const securityEvents = pgTable(
   "security_events",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     /** Subject user, when the event is tied to one. */
     userId: integer("user_id").references(() => users.id),
     /** IP / fingerprint involved, for cluster events. */
@@ -285,9 +266,7 @@ export const securityEvents = sqliteTable(
     detail: text("detail"),
     /** Related vote, when applicable. */
     voteId: integer("vote_id"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byTime: index("security_events_time_idx").on(t.createdAt),
@@ -298,10 +277,10 @@ export const securityEvents = sqliteTable(
 );
 
 /* ── Error events (observability — every caught error, persisted) ─────── */
-export const errorEvents = sqliteTable(
+export const errorEvents = pgTable(
   "error_events",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     /** Where it happened, e.g. "tts_generate", "router_synth", "api". */
     source: text("source").notNull(),
     /** "warn" | "error" | "fatal". */
@@ -321,9 +300,7 @@ export const errorEvents = sqliteTable(
     userId: integer("user_id"),
     /** Free-form JSON context. */
     detail: text("detail"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byTime: index("error_events_time_idx").on(t.createdAt),
@@ -340,10 +317,10 @@ export const errorEvents = sqliteTable(
  * took, whether it succeeded, and how much audio came back — powering per-model
  * P50/P95 latency, success rate, and throughput trends in the admin panel.
  */
-export const generationEvents = sqliteTable(
+export const generationEvents = pgTable(
   "generation_events",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     provider: text("provider").notNull(),
     /** Stable arena model id (FK-shaped, not enforced — models may be reseeded). */
     model: text("model").notNull(),
@@ -352,7 +329,7 @@ export const generationEvents = sqliteTable(
     /** Wall-clock synthesis time in milliseconds. */
     durationMs: integer("duration_ms").notNull(),
     /** Did the synth succeed? */
-    success: integer("success", { mode: "boolean" }).notNull(),
+    success: boolean("success").notNull(),
     /** Bytes of audio returned (0 on failure). */
     audioBytes: integer("audio_bytes").notNull().default(0),
     /** Input text length (chars) — latency tends to scale with it. */
@@ -363,9 +340,7 @@ export const generationEvents = sqliteTable(
     error: text("error"),
     /** Acting user, when known. */
     userId: integer("user_id"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byTime: index("generation_events_time_idx").on(t.createdAt),
@@ -383,10 +358,10 @@ export const generationEvents = sqliteTable(
  * come back, watch live, and browse history. State machine: running → done
  * (or interrupted if the process restarts mid-run; the runner resumes pending).
  */
-export const testRuns = sqliteTable(
+export const testRuns = pgTable(
   "test_runs",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     /** "running" | "done" | "interrupted". */
     status: text("status").notNull().default("running"),
     /** The sentence synthesized for every model in this run. */
@@ -397,10 +372,8 @@ export const testRuns = sqliteTable(
     failed: integer("failed").notNull().default(0),
     /** Admin who started it (username), informational. */
     startedBy: text("started_by"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
-    finishedAt: integer("finished_at", { mode: "timestamp" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    finishedAt: timestamp("finished_at"),
   },
   (t) => ({
     byTime: index("test_runs_time_idx").on(t.createdAt),
@@ -409,10 +382,10 @@ export const testRuns = sqliteTable(
 );
 
 /** One per (run, model): a pending job that the runner fills in as it goes. */
-export const testResults = sqliteTable(
+export const testResults = pgTable(
   "test_results",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     runId: integer("run_id")
       .notNull()
       .references(() => testRuns.id, { onDelete: "cascade" }),
@@ -426,9 +399,7 @@ export const testResults = sqliteTable(
     audioPath: text("audio_path"),
     extension: text("extension"),
     error: text("error"),
-    updatedAt: integer("updated_at", { mode: "timestamp" })
-      .notNull()
-      .default(now),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
     byRun: index("test_results_run_idx").on(t.runId),
@@ -437,16 +408,16 @@ export const testResults = sqliteTable(
 );
 
 /* ── Cap.js captcha storage (proof-of-work; no Redis needed) ──────────── */
-export const capChallenges = sqliteTable("cap_challenges", {
+export const capChallenges = pgTable("cap_challenges", {
   token: text("token").primaryKey(),
   data: text("data").notNull(),
-  /** Expiry as unix-epoch milliseconds (Cap uses ms timestamps). */
-  expires: integer("expires").notNull(),
+  /** Expiry as unix-epoch milliseconds (Cap uses ms timestamps) — bigint. */
+  expires: bigint("expires", { mode: "number" }).notNull(),
 });
 
-export const capTokens = sqliteTable("cap_tokens", {
+export const capTokens = pgTable("cap_tokens", {
   key: text("key").primaryKey(),
-  expires: integer("expires").notNull(),
+  expires: bigint("expires", { mode: "number" }).notNull(),
 });
 
 /* ── Relations ────────────────────────────────────────────────────────── */
@@ -483,5 +454,3 @@ export type ErrorEventRow = typeof errorEvents.$inferSelect;
 export type GenerationEventRow = typeof generationEvents.$inferSelect;
 export type TestRunRow = typeof testRuns.$inferSelect;
 export type TestResultRow = typeof testResults.$inferSelect;
-
-export { sql };

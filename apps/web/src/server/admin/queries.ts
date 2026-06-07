@@ -55,19 +55,19 @@ async function votesPerDay(
   days: number,
   extra?: import("drizzle-orm").SQL,
 ): Promise<{ date: string; count: number; flagged: number }[]> {
-  const since = sql`unixepoch('now', '-${sql.raw(String(days))} days')`;
+  const since = sql`now() - ${sql.raw(`interval '${Number(days)} days'`)}`;
   const cond = extra
     ? and(sql`${votes.createdAt} >= ${since}`, extra)
     : sql`${votes.createdAt} >= ${since}`;
   const rows = await db
     .select({
-      day: sql<string>`date(${votes.createdAt}, 'unixepoch')`,
+      day: sql<string>`to_char(${votes.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
       c: sql<number>`count(*)`,
       f: sql<number>`sum(case when ${votes.flagged} then 1 else 0 end)`,
     })
     .from(votes)
     .where(cond)
-    .groupBy(sql`date(${votes.createdAt}, 'unixepoch')`);
+    .groupBy(sql`to_char(${votes.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`);
   const byDay = new Map(rows.map((r) => [r.day, { c: r.c, f: r.f ?? 0 }]));
   const out: { date: string; count: number; flagged: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -95,12 +95,12 @@ export async function overviewStats(): Promise<AdminOverview> {
   // Votes per day over the last 30 days. Group on the local-less unixepoch day.
   const dayRows = await db
     .select({
-      day: sql<string>`date(${votes.createdAt}, 'unixepoch')`,
+      day: sql<string>`to_char(${votes.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
       c: sql<number>`count(*)`,
     })
     .from(votes)
-    .where(sql`${votes.createdAt} >= unixepoch('now', '-30 days')`)
-    .groupBy(sql`date(${votes.createdAt}, 'unixepoch')`);
+    .where(sql`${votes.createdAt} >= now() - interval '30 days'`)
+    .groupBy(sql`to_char(${votes.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`);
   const byDay = new Map(dayRows.map((r) => [r.day, r.c]));
   const votesByDay: AdminOverview["votesByDay"] = [];
   for (let i = 29; i >= 0; i--) {
@@ -952,11 +952,11 @@ export async function errorOverview(): Promise<AdminErrorOverview> {
     db
       .select({ c: sql<number>`count(*)` })
       .from(errorEvents)
-      .where(sql`${errorEvents.createdAt} >= unixepoch('now', '-1 day')`),
+      .where(sql`${errorEvents.createdAt} >= now() - interval '1 days'`),
     db
       .select({ c: sql<number>`count(*)` })
       .from(errorEvents)
-      .where(sql`${errorEvents.createdAt} >= unixepoch('now', '-7 days')`),
+      .where(sql`${errorEvents.createdAt} >= now() - interval '7 days'`),
     db.select({ c: sql<number>`count(*)` }).from(errorEvents),
     db
       .select({
@@ -968,14 +968,14 @@ export async function errorOverview(): Promise<AdminErrorOverview> {
   // Errors per day for the last 30d, split by source.
   const dayRows = await db
     .select({
-      day: sql<string>`date(${errorEvents.createdAt}, 'unixepoch')`,
+      day: sql<string>`to_char(${errorEvents.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
       source: errorEvents.source,
       c: sql<number>`count(*)`,
     })
     .from(errorEvents)
-    .where(sql`${errorEvents.createdAt} >= unixepoch('now', '-30 days')`)
+    .where(sql`${errorEvents.createdAt} >= now() - interval '30 days'`)
     .groupBy(
-      sql`date(${errorEvents.createdAt}, 'unixepoch')`,
+      sql`to_char(${errorEvents.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
       errorEvents.source,
     );
 
@@ -997,7 +997,7 @@ export async function errorOverview(): Promise<AdminErrorOverview> {
   }
 
   // Last-7d breakdowns by source / model / provider.
-  const week = sql`${errorEvents.createdAt} >= unixepoch('now', '-7 days')`;
+  const week = sql`${errorEvents.createdAt} >= now() - interval '7 days'`;
   const [bySourceRows, byModelRows, byProviderRows] = await Promise.all([
     db
       .select({ source: errorEvents.source, c: sql<number>`count(*)` })
@@ -1130,24 +1130,24 @@ export async function generationOverview(): Promise<AdminGenerationOverview> {
     db
       .select({ c: sql<number>`count(*)` })
       .from(generationEvents)
-      .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-1 day')`),
+      .where(sql`${generationEvents.createdAt} >= now() - interval '1 days'`),
     db
       .select({ c: sql<number>`count(*)` })
       .from(generationEvents)
-      .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-7 days')`),
+      .where(sql`${generationEvents.createdAt} >= now() - interval '7 days'`),
   ]);
 
   // Pull raw 7d rows for percentile math (percentiles aren't native in SQLite).
   const week7 = await db
     .select({
-      day: sql<string>`date(${generationEvents.createdAt}, 'unixepoch')`,
+      day: sql<string>`to_char(${generationEvents.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
       durationMs: generationEvents.durationMs,
       success: generationEvents.success,
       provider: generationEvents.provider,
       model: generationEvents.model,
     })
     .from(generationEvents)
-    .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-7 days')`);
+    .where(sql`${generationEvents.createdAt} >= now() - interval '7 days'`);
 
   const all7 = week7.map((r) => r.durationMs).sort((a, b) => a - b);
   const success7 = week7.filter((r) => r.success).length;
@@ -1187,12 +1187,12 @@ export async function generationOverview(): Promise<AdminGenerationOverview> {
   // Per-day throughput + latency over 30d (raw rows, bucketed in JS).
   const month = await db
     .select({
-      day: sql<string>`date(${generationEvents.createdAt}, 'unixepoch')`,
+      day: sql<string>`to_char(${generationEvents.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
       durationMs: generationEvents.durationMs,
       success: generationEvents.success,
     })
     .from(generationEvents)
-    .where(sql`${generationEvents.createdAt} >= unixepoch('now', '-30 days')`);
+    .where(sql`${generationEvents.createdAt} >= now() - interval '30 days'`);
   const dayMap = new Map<string, { durs: number[]; failures: number }>();
   for (const r of month) {
     let e = dayMap.get(r.day);

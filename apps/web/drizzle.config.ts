@@ -3,10 +3,11 @@ import { defineConfig } from "drizzle-kit";
 export default defineConfig({
   schema: "./src/server/db/schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
   dbCredentials: {
     url:
-      process.env.SQLITE_PATH ?? process.env.DATABASE_URL ?? "./tts_arena.db",
+      process.env.DATABASE_URL ??
+      "postgres://postgres:ttsa@localhost:55433/ttsa",
   },
   strict: true,
   verbose: true,

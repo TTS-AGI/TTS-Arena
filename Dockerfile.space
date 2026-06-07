@@ -5,8 +5,8 @@
 #   - router     (:8080, internal)
 #   - web        (:7860, the port HF exposes)
 #
-# The database is a single SQLite file at /data/tts_arena.db (persistent
-# bucket). Generated audio is logged to /audio (the second persistent bucket).
+# The database is Postgres on a VPS (DATABASE_URL secret, over a Cloudflare
+# tunnel). Generated audio is logged to /audio (a persistent bucket).
 FROM oven/bun:1.1.42-debian AS base
 WORKDIR /app
 
@@ -73,11 +73,12 @@ RUN cd apps/web && bun run build
 FROM base AS runtime
 ENV NODE_ENV=production
 
-# System deps: supervisord, ffmpeg (router audio normalization), sqlite3 (DB
-# integrity check + recovery on boot).
+# System deps: supervisord, ffmpeg (router audio normalization), ca-certificates
+# (verify TLS to the Postgres host). The app connects directly to the VPS
+# Postgres over a TLS connection (DATABASE_URL) — no tunnel client in the Space.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       supervisor ffmpeg sqlite3 \
+       supervisor ffmpeg ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 # App: built web + full source for the router (run from source via bun).

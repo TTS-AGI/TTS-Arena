@@ -18,18 +18,15 @@ export async function logSecurityEvent(e: {
 }): Promise<void> {
   try {
     await withWriteRetry(() =>
-      db
-        .insert(securityEvents)
-        .values({
-          kind: e.kind,
-          severity: e.severity ?? "info",
-          userId: e.userId ?? null,
-          ip: e.ip ?? null,
-          fingerprint: e.fingerprint ?? null,
-          voteId: e.voteId ?? null,
-          detail: e.detail === undefined ? null : JSON.stringify(e.detail),
-        })
-        .run(),
+      db.insert(securityEvents).values({
+        kind: e.kind,
+        severity: e.severity ?? "info",
+        userId: e.userId ?? null,
+        ip: e.ip ?? null,
+        fingerprint: e.fingerprint ?? null,
+        voteId: e.voteId ?? null,
+        detail: e.detail === undefined ? null : JSON.stringify(e.detail),
+      }),
     );
   } catch {
     // Non-critical.

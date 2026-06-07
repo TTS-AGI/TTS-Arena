@@ -40,8 +40,7 @@ function getCap(): Cap {
               .onConflictDoUpdate({
                 target: capChallenges.token,
                 set: { data: JSON.stringify(data), expires: data.expires },
-              })
-              .run(),
+              }),
           );
         },
         read: async (token: string) => {
@@ -52,32 +51,24 @@ function getCap(): Cap {
         },
         delete: async (token: string) => {
           await withWriteRetry(() =>
-            db
-              .delete(capChallenges)
-              .where(eq(capChallenges.token, token))
-              .run(),
+            db.delete(capChallenges).where(eq(capChallenges.token, token)),
           );
         },
         deleteExpired: async () => {
           await withWriteRetry(() =>
             db
               .delete(capChallenges)
-              .where(lt(capChallenges.expires, Date.now()))
-              .run(),
+              .where(lt(capChallenges.expires, Date.now())),
           );
         },
       },
       tokens: {
         store: async (key: string, expires: number) => {
           await withWriteRetry(() =>
-            db
-              .insert(capTokens)
-              .values({ key, expires })
-              .onConflictDoUpdate({
-                target: capTokens.key,
-                set: { expires },
-              })
-              .run(),
+            db.insert(capTokens).values({ key, expires }).onConflictDoUpdate({
+              target: capTokens.key,
+              set: { expires },
+            }),
           );
         },
         get: async (key: string) => {
@@ -88,12 +79,12 @@ function getCap(): Cap {
         },
         delete: async (key: string) => {
           await withWriteRetry(() =>
-            db.delete(capTokens).where(eq(capTokens.key, key)).run(),
+            db.delete(capTokens).where(eq(capTokens.key, key)),
           );
         },
         deleteExpired: async () => {
           await withWriteRetry(() =>
-            db.delete(capTokens).where(lt(capTokens.expires, Date.now())).run(),
+            db.delete(capTokens).where(lt(capTokens.expires, Date.now())),
           );
         },
       },

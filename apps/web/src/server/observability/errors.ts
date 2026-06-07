@@ -41,22 +41,19 @@ export async function logErrorEvent(e: {
         ? null
         : JSON.stringify(e.detail).slice(0, MAX_DETAIL);
     await withWriteRetry(() =>
-      db
-        .insert(errorEvents)
-        .values({
-          source: e.source,
-          severity: e.severity ?? "error",
-          message: e.message.slice(0, MAX_MESSAGE),
-          stack: e.stack ? e.stack.slice(0, MAX_STACK) : null,
-          route: e.route ?? null,
-          method: e.method ?? null,
-          provider: e.provider ?? null,
-          model: e.model ?? null,
-          status: e.status ?? null,
-          userId: e.userId ?? null,
-          detail,
-        })
-        .run(),
+      db.insert(errorEvents).values({
+        source: e.source,
+        severity: e.severity ?? "error",
+        message: e.message.slice(0, MAX_MESSAGE),
+        stack: e.stack ? e.stack.slice(0, MAX_STACK) : null,
+        route: e.route ?? null,
+        method: e.method ?? null,
+        provider: e.provider ?? null,
+        model: e.model ?? null,
+        status: e.status ?? null,
+        userId: e.userId ?? null,
+        detail,
+      }),
     );
   } catch {
     // Non-critical — never let error logging break the request.
@@ -129,17 +126,14 @@ export async function pruneErrorEvents(): Promise<number> {
       const ids = oldest.map((r) => r.id);
       if (ids.length) {
         await withWriteRetry(() =>
-          db
-            .delete(errorEvents)
-            .where(
-              and(
-                sql`${errorEvents.id} in (${sql.join(
-                  ids.map((i) => sql`${i}`),
-                  sql`, `,
-                )})`,
-              ),
-            )
-            .run(),
+          db.delete(errorEvents).where(
+            and(
+              sql`${errorEvents.id} in (${sql.join(
+                ids.map((i) => sql`${i}`),
+                sql`, `,
+              )})`,
+            ),
+          ),
         );
         removed += ids.length;
       }
