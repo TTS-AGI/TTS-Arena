@@ -1,0 +1,97 @@
+---
+title: Development
+description: Run TTS Arena locally and find your way around the codebase.
+---
+
+TTS Arena is a [Bun](https://bun.sh) monorepo. The web app is Next.js; the
+router is a separate Hono service that talks to providers.
+
+## Prerequisites
+
+- [Bun](https://bun.sh) 1.1.42
+- A Postgres database
+- A Hugging Face OAuth app for sign-in
+  ([create one](https://huggingface.co/settings/applications/new))
+
+## Setup
+
+```bash
+git clone https://github.com/TTS-AGI/TTS-Arena
+cd TTS-Arena
+bun install
+```
+
+Point `DATABASE_URL` at your Postgres instance, then create the schema and seed
+a starter set of models:
+
+```bash
+cd apps/web
+bun run db:migrate
+bun run db:seed
+```
+
+## Configuration
+
+Set these in the environment (e.g. an `.env` the web app can read):
+
+| Variable                 | Required | Notes                                                                     |
+| ------------------------ | -------- | ------------------------------------------------------------------------- |
+| `DATABASE_URL`           | yes      | Postgres connection string. Add `?sslmode=require` for a TLS-only server. |
+| `HF_OAUTH_CLIENT_ID`     | yes      | From your Hugging Face OAuth app.                                         |
+| `HF_OAUTH_CLIENT_SECRET` | yes      | Same app.                                                                 |
+| `SESSION_SECRET`         | yes      | Any long random string.                                                   |
+| `ADMIN_USERS`            | no       | Comma-separated HF usernames with admin access.                           |
+| `ROUTER_URL`             | no       | Router base URL. Defaults to `http://localhost:8080`.                     |
+| `APP_URL`                | no       | Public app URL. Defaults to `http://localhost:3000`.                      |
+| `SECURITY_DISABLED`      | no       | Set to `1` to turn off the anti-fraud gate in local dev.                  |
+
+Provider API keys are read by the router from the environment too - add them as
+you wire up providers.
+
+## Running
+
+```bash
+bun run dev          # web app on :3000
+bun run dev:router   # router on :8080
+```
+
+## Useful scripts
+
+Run from the repo root:
+
+```bash
+bun run build        # build every workspace
+bun run lint         # lint every workspace
+bun run typecheck    # type-check every workspace
+bun test             # run tests
+bun run format       # prettier --write
+```
+
+And from `apps/web` for database work:
+
+```bash
+bun run db:generate    # generate a migration from schema changes
+bun run db:migrate     # apply migrations
+bun run db:seed        # seed models from the provider packages
+bun run db:recompute   # replay clean votes and rebuild ratings
+```
+
+## Layout
+
+```
+apps/web        Next.js app - arena, leaderboard, admin
+apps/router     Hono service that calls TTS providers
+apps/docs       this documentation site (Fumadocs)
+packages/shared        shared types + the rating math
+packages/provider-sdk  provider interface + registry
+packages/providers/*   individual public providers
+```
+
+The rating logic lives in `packages/shared` - `bradley-terry.ts` and
+`glicko.ts` - with tests alongside. See [Ranking](/ranking) for how it's used.
+
+## Contributing
+
+Issues and pull requests are welcome on
+[GitHub](https://github.com/TTS-AGI/TTS-Arena). The project is licensed under
+[Apache 2.0](https://github.com/TTS-AGI/TTS-Arena/blob/main/LICENSE).

@@ -1,60 +1,54 @@
 ---
-title: How ranking works
-description: One Bradley–Terry fit over every matchup, ranked by a conservative lower bound.
+title: Ranking
+description: How votes become a leaderboard.
 ---
 
-Every vote is a head-to-head result between two models. We turn that stream of
-pairwise outcomes into a single leaderboard.
+Each vote is one head-to-head result: model A beat model B on this prompt. The
+leaderboard is what falls out when you fit all of those results together.
 
-## One model: Bradley–Terry
+## The rating
 
-The board is ranked by a single **Bradley–Terry** fit over the full history of
-matchups. Bradley–Terry finds the maximum-likelihood "strength" of every model
-that best explains every recorded head-to-head at once — so the ranking reflects
-_all_ the evidence, not just the last few votes, and it's order-independent
-(replaying the same votes always gives the same result).
+We rank models with a [Bradley–Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model)
+model - a standard way to turn pairwise wins and losses into a single strength
+score per competitor. It's fit over the entire vote history at once, so a
+model's rating reflects every matchup it has been in, not just its recent ones.
+The result doesn't depend on the order votes arrived in.
 
-Ratings are centered on ~1500. The fit is cached and recomputed as new votes
-accumulate, so the board stays current without refitting on every single vote.
+Ratings are centered around 1500, so the numbers read like familiar Elo scores.
+The fit is cached and refreshed as votes come in.
 
-## Ranked by the lower bound, not the point estimate
+## Rank by the lower bound
 
-We **display** each model's point rating, but we **rank** by a conservative
-_lower bound_ — the bottom of its confidence interval. A model can't top the
-board on a lucky handful of votes: it has to be both good **and** certain. As a
-model plays more, its interval tightens and the displayed `± uncertainty`
-shrinks. You'll see large error bars on new models and small ones on
-well-established ones.
+A model's rating comes with a confidence interval - wide when there's little
+data, narrow once it has played a lot. We show the rating but **sort by the
+bottom of that interval**.
 
-## Small samples are regularized
+The effect: a model can't shoot to the top off a handful of lucky wins. It has
+to be both good and well-tested to rank highly. Each row shows a `±` next to its
+rating so you can see how settled it is.
 
-A maximum-likelihood fit has a sharp edge: a model that has only ever won (or
-only ever lost) has an undefined "infinite" strength, which on a tiny sample
-would produce a nonsense rating. We add a light **Bayesian prior** — a couple of
-virtual, evenly-split games against an average opponent — to every model. This
-pulls extreme records on tiny samples toward the center, and the effect
-_vanishes_ as real games accumulate: by a few dozen votes it's negligible, and
-by a few hundred it's gone entirely. It only ever disciplines the smallest
-samples.
+## New models
 
-## When models appear
+- A model needs **100 votes** to appear on the board. Below that the rating
+  swings too much to mean anything.
+- Under **300 votes** it's marked **Preliminary** - ranked normally, but still
+  moving.
+- Brand-new models with only a few votes are hidden by default. Tick **Show new
+  models with few votes** on the leaderboard to see them, with wide error bars.
 
-- A model must reach **100 counted votes** to appear on the default board —
-  below that, the rating is too noisy to be meaningful.
-- Below **300 votes** a model is badged **Preliminary**: it's ranked normally,
-  but its rating is still settling and may move as more votes land.
-- Newly added models with only a few votes are hidden by default; tick **“Show
-  new models with few votes”** on the leaderboard to reveal them (with wide
-  uncertainty bars).
+To keep tiny samples from producing absurd numbers (a model that has only ever
+won would otherwise rate infinitely high), the fit is lightly regularized toward
+the average. The nudge fades as real votes accumulate and is gone within a few
+hundred.
 
-## Why blind, why pairwise
+## Why blind and pairwise
 
-Naming a model colors how people hear it, so identities stay hidden until after
-the vote. And pairwise preference ("which is better, A or B?") is far easier and
-more reliable for listeners than scoring a clip in isolation — the same reason
-listening tests have always been comparative.
+Knowing a model's name changes how people hear it, so identities stay hidden
+until after the vote. And "which of these two is better?" is a far easier and
+more reliable judgment than scoring a single clip out of context - it's how
+listening tests have always been run.
 
 <Callout type="info">
-  Only **clean** votes count toward ratings. Votes flagged by the anti-fraud
-  system, and votes from quarantined accounts, are excluded from the fit.
+  Only clean votes count. Votes flagged by the anti-fraud system, and votes from
+  quarantined accounts, are left out of the fit. See [Voting](/voting).
 </Callout>

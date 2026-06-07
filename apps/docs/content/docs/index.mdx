@@ -3,40 +3,44 @@ title: Introduction
 description: A crowdsourced, blind benchmark for text-to-speech.
 ---
 
-**TTS Arena** ranks text-to-speech models the only way that really matters — by
-ear, in a blind head-to-head. You type a line, two anonymous models read it
-back, and you pick the one that sounds more human. Every vote updates the
-leaderboard.
+**TTS Arena** ranks text-to-speech models by ear. You type a line, two anonymous
+models read it back, and you pick the one that sounds more human. Each vote
+feeds the leaderboard.
 
-## Why it exists
+The models stay hidden until you've voted, so the choice is about the audio, not
+the name attached to it.
 
-Speech synthesis has never had a good yardstick. Word error rate measures
-intelligibility, not whether a voice sounds alive; mean opinion scores depend on
-a handful of listeners in a lab. TTS Arena replaces both with open, large-scale
-human preference: anyone can listen, compare, and vote, and the rankings that
-fall out belong to everyone.
+[**Open the arena and vote →**](https://huggingface.co/spaces/TTS-AGI/TTS-Arena-V2)
 
-## How it works
+## Why
+
+There hasn't been a good way to measure how natural a synthetic voice sounds.
+Word error rate tells you whether speech is intelligible, not whether it sounds
+alive. Mean opinion scores rely on a small panel in a lab. TTS Arena uses
+large-scale human preference instead - anyone can listen, compare, and vote, and
+the resulting leaderboard is open.
+
+## Start here
 
 <Cards>
-  <Card title="How ranking works" href="/docs/ranking">
-    One Bradley–Terry fit over every matchup, ranked by a conservative lower
-    bound so small samples can’t game the board.
+  <Card title="Voting" href="/voting">
+    How to vote and the rules that keep the board fair.
   </Card>
-  <Card title="Voting" href="/docs/voting">
-    What makes a vote count, and the rules that keep the board fair.
+  <Card title="Ranking" href="/ranking">
+    How votes become a leaderboard.
   </Card>
-  <Card title="Submit a model" href="/docs/submit-a-model">
-    Add your model for evaluation — public or anonymous pre-release.
+  <Card title="Submit a model" href="/submit-a-model">
+    Add your model, publicly or under a codename.
   </Card>
-  <Card title="Provider API" href="/docs/api">
-    The contract your TTS endpoint needs to meet to join the arena.
+  <Card title="Provider API" href="/api">
+    The HTTP contract your TTS endpoint needs to meet.
   </Card>
 </Cards>
 
 ## Quick facts
 
-- Sign in with Hugging Face to vote — accounts must be at least 30 days old.
-- Prompts are English-only for now and capped at 1,000 characters.
-- Models stay anonymous until you've voted; only then are A and B revealed.
-- New models appear quickly and settle as votes accumulate.
+- Sign in with Hugging Face to vote; accounts must be at least 30 days old.
+- Prompts are English-only for now, capped at 1,000 characters.
+- Models are revealed only after you vote.
+- TTS Arena is open source under Apache 2.0 -
+  [source on GitHub](https://github.com/TTS-AGI/TTS-Arena).

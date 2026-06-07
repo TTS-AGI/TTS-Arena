@@ -1,4 +1,11 @@
 {
   "title": "Docs",
-  "pages": ["index", "ranking", "voting", "submit-a-model", "api"]
+  "pages": [
+    "index",
+    "voting",
+    "ranking",
+    "submit-a-model",
+    "api",
+    "development"
+  ]
 }
