@@ -21,6 +21,7 @@ import "@ttsa/provider-mars";
 import "@ttsa/provider-tontaube";
 import "@ttsa/provider-voiceai";
 import "@ttsa/provider-deepdub";
+import "@ttsa/provider-smallest";
 
 let loaded = false;
 

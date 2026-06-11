@@ -22,6 +22,7 @@
     "@ttsa/provider-mars": "workspace:*",
     "@ttsa/provider-minimax": "workspace:*",
     "@ttsa/provider-sdk": "workspace:*",
+    "@ttsa/provider-smallest": "workspace:*",
     "@ttsa/provider-tontaube": "workspace:*",
     "@ttsa/provider-typecast": "workspace:*",
     "@ttsa/provider-voiceai": "workspace:*",
