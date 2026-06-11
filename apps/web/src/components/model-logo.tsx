@@ -18,6 +18,7 @@ const FULL_BLEED = new Set([
   "/logos/cartesia.webp",
   "/logos/gradium.webp",
   "/logos/camb.webp",
+  "/logos/deepdub.webp",
   "/logos/default.webp",
   // Legacy (retired) model logos that ship their own background.
   "/logos/maya.webp",

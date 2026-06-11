@@ -25,6 +25,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@ttsa/provider-cartesia": "workspace:*",
     "@ttsa/provider-chatterbox": "workspace:*",
+    "@ttsa/provider-deepdub": "workspace:*",
     "@ttsa/provider-elevenlabs": "workspace:*",
     "@ttsa/provider-gradium": "workspace:*",
     "@ttsa/provider-hume": "workspace:*",

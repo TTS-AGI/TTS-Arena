@@ -20,6 +20,7 @@ import "@ttsa/provider-inworld";
 import "@ttsa/provider-mars";
 import "@ttsa/provider-tontaube";
 import "@ttsa/provider-voiceai";
+import "@ttsa/provider-deepdub";
 
 let loaded = false;
 
