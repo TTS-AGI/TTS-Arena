@@ -26,10 +26,16 @@ const ICON = "/logos/deepdub.webp";
 const MODEL = "dd-etts-3.2";
 const LOCALE = "en-US";
 
-// Deepdub preset voice prompt ids. Rotated across battles.
+// Deepdub's official recommended voices (provided by Deepdub). Rotated across
+// battles. NOTE: do not substitute SDK/CLI demo prompt ids here — those are
+// generic placeholders and don't represent the model.
 const VOICES = [
-  "26c5f982-e80b-4252-b4c2-bd7e118fcd72_prompt-reading-neutral",
-  "5d3dc622-69bd-4c00-9513-05df47dbdea6_authoritative",
+  "26c5f982-e80b-4252-b4c2-bd7e118fcd72_prompt-reading-neutral", // Samuel Gray
+  "776aa833-fc77-4eac-9203-13da9021030c_prompt-reading-neutral", // Roy Rivera
+  "8a12db1b-6c6d-4474-b8cf-3c0c2d3b105e_reading-neutral", // Terry Wood
+  "337e4733-acc7-4bb8-aef8-6e9404c8b874", // Heather Long
+  "33f02485-049f-4436-b6b7-0aaa7c7ff5d5_reading-neutral", // Anne Phillips
+  "b532c72a-662a-41b7-8470-68c34181b734_reading-neutral", // Denise Cox
 ];
 
 function key() {
