@@ -9,7 +9,8 @@ description: What makes a vote count, and the rules that keep the board fair.
 2. Two anonymous models - **A** and **B** - synthesize it.
 3. Listen to both, then pick the one that sounds more human. One choice, no
    skips.
-4. Both models' ratings update, and their identities are revealed.
+4. The identities are revealed. If the line came unchanged from **Random**, the
+   public ratings update.
 
 You need to listen to enough of each clip before voting unlocks - this keeps
 votes grounded in the audio rather than reflexive clicks.
@@ -21,6 +22,9 @@ votes grounded in the audio rather than reflexive clicks.
 - **English only**, for now - it's the language all models support. Multilingual
   is on the roadmap.
 - Prompts are capped at **1,000 characters**.
+- Only clean votes on first-use **Random** prompts move the public leaderboard.
+  Typed custom prompts are still useful for side-by-side listening, but they do
+  not affect ratings.
 
 ## Keeping it fair
 

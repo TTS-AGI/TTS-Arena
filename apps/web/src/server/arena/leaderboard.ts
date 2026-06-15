@@ -42,10 +42,15 @@ export async function getLeaderboard(
   // "show new models" toggle), the floor drops to any model with at least one
   // counted match, so freshly-added models are discoverable right away (still
   // badged "Preliminary" until they cross the establishment threshold).
-  const floor = (m: (typeof typeModels)[number]) =>
-    includePreliminary ? m.matchCount > 0 : isRanked(m.matchCount);
+  const publicGames = (id: string) => bt.get(id)?.games ?? 0;
+  const floor = (m: (typeof typeModels)[number]) => {
+    const games = publicGames(m.id);
+    return includePreliminary ? games > 0 : isRanked(games);
+  };
   const rows = typeModels.filter(floor).map((m) => {
     const btr = bt.get(m.id);
+    const games = btr?.games ?? 0;
+    const wins = btr?.wins ?? 0;
 
     // Display rating + ranking lower bound + ± uncertainty. Prefer the single
     // BT fit for everyone (rank by its CI lower bound); fall back to live
@@ -75,17 +80,23 @@ export async function getLeaderboard(
       elo: Math.round(rating),
       lowerBound,
       uncertainty,
-      winRate: m.matchCount > 0 ? (m.winCount / m.matchCount) * 100 : 0,
-      totalVotes: m.matchCount,
+      winRate: games > 0 ? (wins / games) * 100 : 0,
+      totalVotes: games,
       open: m.isOpen,
-      preliminary: !isEstablished(m.matchCount),
+      preliminary: !isEstablished(games),
       active: m.isActive,
     };
   });
 
   // Rank by the conservative lower bound (good AND certain), then strip it —
   // it's an internal sort key, not part of the public row.
-  rows.sort((a, b) => b.lowerBound - a.lowerBound);
+  rows.sort(
+    (a, b) =>
+      b.lowerBound - a.lowerBound ||
+      b.elo - a.elo ||
+      b.totalVotes - a.totalVotes ||
+      a.id.localeCompare(b.id),
+  );
 
   return rows.map((row, i) => {
     const { lowerBound, ...r } = row;

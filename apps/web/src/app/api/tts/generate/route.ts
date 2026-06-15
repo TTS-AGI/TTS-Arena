@@ -14,7 +14,11 @@ import {
 } from "@ttsa/shared";
 import { currentUser } from "@/server/auth/user";
 import { generateBattle } from "@/server/arena/generate";
-import { isEnglish } from "@/server/arena/sentences";
+import {
+  isConsumed,
+  isEnglish,
+  verifyPromptToken,
+} from "@/server/arena/sentences";
 import { errInfo, logErrorEvent } from "@/server/observability/errors";
 
 export async function POST(req: Request) {
@@ -33,12 +37,25 @@ export async function POST(req: Request) {
     );
   }
   const text = parsed.data.text.trim();
-  const origin = parsed.data.fromPool ? "dataset" : "custom";
+  const fromPool = parsed.data.fromPool ?? false;
 
   if (!isEnglish(text)) {
     return NextResponse.json(
       { error: "English-only for now — multilingual is coming soon" },
       { status: 400 },
+    );
+  }
+  if (fromPool && !verifyPromptToken(text, parsed.data.promptToken ?? null)) {
+    return NextResponse.json(
+      { error: "That random line expired. Try another one." },
+      { status: 400 },
+    );
+  }
+  const origin = fromPool ? "dataset" : "custom";
+  if (origin === "dataset" && (await isConsumed(text))) {
+    return NextResponse.json(
+      { error: "That random line has already been used. Try another one." },
+      { status: 409 },
     );
   }
 

@@ -46,6 +46,7 @@ export function Arena() {
   // The exact prompt last loaded from the pool (Random). The vote counts as a
   // "dataset" prompt only if the user generates with this text unchanged.
   const poolText = useRef<string | null>(null);
+  const poolToken = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [phase, setPhase] = useState<Phase>("compose");
   const [battle, setBattle] = useState<Battle | null>(null);
@@ -108,7 +109,11 @@ export function Arena() {
       const res = await fetch("/api/tts/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed, fromPool }),
+        body: JSON.stringify({
+          text: trimmed,
+          fromPool,
+          promptToken: fromPool ? poolToken.current : undefined,
+        }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as {
@@ -145,6 +150,7 @@ export function Arena() {
       const data = (await res.json()) as RandomSentenceResponse;
       setText(data.sentence);
       poolText.current = data.sentence.trim();
+      poolToken.current = data.promptToken;
     } catch (e) {
       toast.error(
         "Couldn't fetch a random line",

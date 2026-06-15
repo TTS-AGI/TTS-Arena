@@ -3,8 +3,9 @@ title: Ranking
 description: How votes become a leaderboard.
 ---
 
-Each vote is one head-to-head result: model A beat model B on this prompt. The
-leaderboard is what falls out when you fit all of those results together.
+Each counting vote is one head-to-head result: model A beat model B on a
+controlled prompt from the Random pool. The leaderboard is what falls out when
+you fit all of those results together.
 
 ## The rating
 
@@ -49,6 +50,7 @@ more reliable judgment than scoring a single clip out of context - it's how
 listening tests have always been run.
 
 <Callout type="info">
-  Only clean votes count. Votes flagged by the anti-fraud system, and votes from
-  quarantined accounts, are left out of the fit. See [Voting](/voting).
+  Only clean votes on first-use Random prompts count. Typed custom prompts,
+  votes flagged by the anti-fraud system, and votes from quarantined accounts
+  are left out of the fit. See [Voting](/voting).
 </Callout>

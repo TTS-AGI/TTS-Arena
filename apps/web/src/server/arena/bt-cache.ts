@@ -12,6 +12,7 @@ import { db } from "../db/client";
 import { models, users, votes } from "../db/schema";
 
 const RECOMPUTE_DELTA = 50;
+const BT_BOOTSTRAPS = 400;
 
 type Entry = { voteCount: number; ratings: Map<string, BTRating> };
 const cache = new Map<ModelType, Entry>();
@@ -29,6 +30,7 @@ async function countingVotes(type: ModelType): Promise<number> {
     .where(
       and(
         eq(votes.modelType, type),
+        eq(votes.sentenceOrigin, "dataset"),
         eq(votes.countsForPublic, true),
         eq(users.quarantined, false),
       ),
@@ -56,20 +58,24 @@ export async function getBTRatings(
     .where(
       and(
         eq(votes.modelType, type),
+        eq(votes.sentenceOrigin, "dataset"),
         eq(votes.countsForPublic, true),
         eq(users.quarantined, false),
       ),
     );
 
+  const observedIds = new Set(outcomes.flatMap((o) => [o.winner, o.loser]));
   const ids = (
     await db
       .select({ id: models.id })
       .from(models)
       .where(eq(models.modelType, type))
-  ).map((r) => r.id);
+  )
+    .map((r) => r.id)
+    .filter((id) => observedIds.has(id));
 
   const ratings = new Map(
-    bradleyTerry(ids, outcomes, 100).map((r) => [r.id, r]),
+    bradleyTerry(ids, outcomes, BT_BOOTSTRAPS).map((r) => [r.id, r]),
   );
   cache.set(type, { voteCount: total, ratings });
   return ratings;

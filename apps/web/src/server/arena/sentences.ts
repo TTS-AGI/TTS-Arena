@@ -3,14 +3,60 @@
  * heuristic, and consumed-sentence bookkeeping. The live prompt pool is the
  * `combined_prompts.txt` corpus (see prompt-pool), accessed by random line.
  */
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { consumedSentences } from "../db/schema";
+import { serverEnv } from "../env";
 import { promptCount, randomPrompt } from "./prompt-pool";
+
+const PROMPT_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 export function hashSentence(text: string): string {
   return createHash("sha256").update(text.trim()).digest("hex");
+}
+
+function signPayload(payload: string): string {
+  return createHmac("sha256", serverEnv.sessionSecret())
+    .update(payload)
+    .digest("base64url");
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ab.length === bb.length && timingSafeEqual(ab, bb);
+}
+
+/** Signed proof that a prompt was served by the random corpus endpoint. */
+export function signPromptToken(text: string): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      h: hashSentence(text),
+      exp: Date.now() + PROMPT_TOKEN_TTL_MS,
+    }),
+  ).toString("base64url");
+  return `${payload}.${signPayload(payload)}`;
+}
+
+export function verifyPromptToken(text: string, token: string | null): boolean {
+  if (!token) return false;
+  const [payload, sig, extra] = token.split(".");
+  if (!payload || !sig || extra !== undefined) return false;
+  if (!safeEqual(signPayload(payload), sig)) return false;
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8"),
+    ) as { h?: unknown; exp?: unknown };
+    return (
+      parsed.h === hashSentence(text) &&
+      typeof parsed.exp === "number" &&
+      parsed.exp >= Date.now()
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

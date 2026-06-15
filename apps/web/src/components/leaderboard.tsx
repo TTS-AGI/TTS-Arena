@@ -52,7 +52,10 @@ export function Leaderboard() {
 
   const sorted = useMemo(() => {
     if (!rows) return [];
-    return [...rows].sort((a, b) => b[sort] - a[sort]);
+    return [...rows].sort((a, b) => {
+      if (sort === "elo") return a.rank - b.rank;
+      return b[sort] - a[sort] || a.rank - b.rank;
+    });
   }, [rows, sort]);
 
   const eloRange = useMemo(() => {

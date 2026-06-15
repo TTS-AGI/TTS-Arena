@@ -4,7 +4,7 @@
  */
 import { NextResponse } from "next/server";
 import type { RandomSentenceResponse } from "@ttsa/shared";
-import { randomUnconsumed } from "@/server/arena/sentences";
+import { randomUnconsumed, signPromptToken } from "@/server/arena/sentences";
 
 export async function GET() {
   const sentence = await randomUnconsumed();
@@ -14,6 +14,9 @@ export async function GET() {
       { status: 404 },
     );
   }
-  const body: RandomSentenceResponse = { sentence };
+  const body: RandomSentenceResponse = {
+    sentence,
+    promptToken: signPromptToken(sentence),
+  };
   return NextResponse.json(body);
 }

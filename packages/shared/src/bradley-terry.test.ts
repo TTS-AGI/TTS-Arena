@@ -97,6 +97,34 @@ describe("bradleyTerry", () => {
     expect(w.rating).toBeLessThan(1750);
   });
 
+  test("perfect records still have uncertainty", () => {
+    const ranked = bradleyTerry(
+      ["winner", "loser"],
+      games("winner", "loser", 20),
+      400,
+    );
+    const winner = ranked.find((r) => r.id === "winner")!;
+    const loser = ranked.find((r) => r.id === "loser")!;
+    expect(winner.ciLow).toBeLessThan(winner.rating);
+    expect(loser.ciHigh).toBeGreaterThan(loser.rating);
+  });
+
+  test("inactive catalog models do not shift active ratings", () => {
+    const outcomes = games("a", "b", 100);
+    const base = bradleyTerry(["a", "b"], outcomes, 0);
+    const withInactive = bradleyTerry(
+      ["a", "b", ...Array.from({ length: 100 }, (_, i) => `z${i}`)],
+      outcomes,
+      0,
+    );
+    const rating = (rows: ReturnType<typeof bradleyTerry>, id: string) =>
+      rows.find((r) => r.id === id)!.rating;
+
+    expect(rating(withInactive, "a")).toBeCloseTo(rating(base, "a"), 6);
+    expect(rating(withInactive, "b")).toBeCloseTo(rating(base, "b"), 6);
+    expect(rating(withInactive, "z0")).toBe(1500);
+  });
+
   test("the prior vanishes with data: a 1-win lead shrinks as games pile up", () => {
     // A model that's 1 game ahead on a tiny sample should rate far above its
     // rival; the same +1 net on a large sample should be nearly even — the

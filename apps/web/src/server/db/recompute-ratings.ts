@@ -1,9 +1,10 @@
 /**
  * Recompute every model's live Glicko-2 rating from scratch by replaying all
- * *clean* counting votes in chronological order — votes with
- * countsForPublic=true whose author isn't quarantined. Use after a bulk data
- * change (backfill, retro-flagging by the security sweep, or a manual flag) so
- * live ratings reflect only legitimate votes. Resets win/match counters too.
+ * *clean* public votes in chronological order — first-use Random-prompt votes
+ * with countsForPublic=true whose author isn't quarantined. Use after a bulk
+ * data change (backfill, retro-flagging by the security sweep, or a manual
+ * flag) so live ratings reflect only legitimate votes. Resets win/match
+ * counters too.
  * Idempotent.
  *
  * Run with: bun run src/server/db/recompute-ratings.ts
@@ -35,7 +36,8 @@ export async function recomputeFromCleanVotes(): Promise<number> {
     ]),
   );
 
-  // Clean = counts for public AND author not quarantined.
+  // Clean public = first-use Random prompt, counts for public, and author not
+  // quarantined.
   const counting = await db
     .select({
       chosenModelId: votes.chosenModelId,
@@ -43,7 +45,13 @@ export async function recomputeFromCleanVotes(): Promise<number> {
     })
     .from(votes)
     .innerJoin(users, eq(votes.userId, users.id))
-    .where(and(eq(votes.countsForPublic, true), eq(users.quarantined, false)))
+    .where(
+      and(
+        eq(votes.sentenceOrigin, "dataset"),
+        eq(votes.countsForPublic, true),
+        eq(users.quarantined, false),
+      ),
+    )
     .orderBy(asc(votes.createdAt), asc(votes.id));
 
   for (const v of counting) {

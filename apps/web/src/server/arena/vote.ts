@@ -11,6 +11,7 @@ import { glickoUpdate, type Glicko } from "@ttsa/shared";
 import { db } from "../db/client";
 import {
   battleSessions,
+  consumedSentences,
   models,
   ratingHistory,
   voiceStats,
@@ -44,10 +45,12 @@ export async function recordVote(
   // otherwise "custom") and carried on the session.
   const origin = session.origin;
 
-  // Anti-fraud gate: a flagged (or blocked) vote is still stored, but does NOT
-  // count toward public ratings — the rating math below is skipped entirely.
+  // Public-rating gate: only clean, first-use dataset prompts affect the board.
+  // Custom prompt votes are useful for listening/reveal, but not for the
+  // benchmark ranking.
   const flagged = assessment?.flag ?? false;
-  const counts = !flagged && !(assessment?.block ?? false);
+  let counts =
+    !flagged && !(assessment?.block ?? false) && origin === "dataset";
   const riskScore = assessment?.riskScore ?? 0;
   const riskReasons = assessment?.reasons.length
     ? JSON.stringify(assessment.reasons)
@@ -65,7 +68,23 @@ export async function recordVote(
       .set({ voted: true })
       .where(eq(battleSessions.id, session.id));
 
-    // 1. Persist the vote.
+    // 1. Claim this dataset prompt for public rating. The prompt corpus is
+    // large, and each corpus sentence should affect the leaderboard at most
+    // once. If another session already consumed it, the vote is stored but does
+    // not move ratings.
+    if (counts) {
+      const claimed = await tx
+        .insert(consumedSentences)
+        .values({
+          sentenceHash: session.sentenceHash,
+          sentenceText: session.text.trim(),
+        })
+        .onConflictDoNothing()
+        .returning({ id: consumedSentences.id });
+      counts = claimed.length > 0;
+    }
+
+    // 2. Persist the vote.
     const [vote] = await tx
       .insert(votes)
       .values({
@@ -92,7 +111,7 @@ export async function recordVote(
 
     if (!counts) return;
 
-    // 2. Live Glicko-2 update for both models.
+    // 3. Live Glicko-2 update for both models.
     const chosenRow = await tx.query.models.findFirst({
       where: eq(models.id, chosenSide.modelId),
     });
@@ -132,7 +151,7 @@ export async function recordVote(
       })
       .where(eq(models.id, rejectedRow.id));
 
-    // 3. Rating history trail.
+    // 4. Rating history trail.
     await tx.insert(ratingHistory).values([
       {
         modelId: chosenRow.id,
@@ -150,7 +169,7 @@ export async function recordVote(
       },
     ]);
 
-    // 4. Per-voice stats (win for chosen voice, match for both).
+    // 5. Per-voice stats (win for chosen voice, match for both).
     await upsertVoiceStat(tx, chosenRow.id, chosenSide.voice, true);
     await upsertVoiceStat(tx, rejectedRow.id, rejectedSide.voice, false);
   });

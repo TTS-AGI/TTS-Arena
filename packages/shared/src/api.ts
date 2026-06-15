@@ -31,6 +31,8 @@ export const ttsGenerateRequestSchema = z.object({
   /** True when the text came from the prompt pool (the Random button), not
    *  free-typed. Determines the vote's recorded sentenceOrigin. */
   fromPool: z.boolean().optional(),
+  /** Signed proof that this exact prompt was served by the random endpoint. */
+  promptToken: z.string().optional(),
 });
 export type TTSGenerateRequest = z.infer<typeof ttsGenerateRequestSchema>;
 
@@ -131,6 +133,7 @@ export type TopVoter = z.infer<typeof topVoterSchema>;
 
 export const randomSentenceResponseSchema = z.object({
   sentence: z.string(),
+  promptToken: z.string(),
 });
 export type RandomSentenceResponse = z.infer<
   typeof randomSentenceResponseSchema
