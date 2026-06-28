@@ -21,6 +21,7 @@ const FULL_BLEED = new Set([
   "/logos/deepdub.webp",
   "/logos/smallest.webp",
   "/logos/hithink.webp",
+  "/logos/rumik.webp",
   "/logos/default.webp",
   // Legacy (retired) model logos that ship their own background.
   "/logos/maya.webp",

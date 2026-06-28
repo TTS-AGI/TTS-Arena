@@ -23,6 +23,7 @@ import "@ttsa/provider-voiceai";
 import "@ttsa/provider-deepdub";
 import "@ttsa/provider-smallest";
 import "@ttsa/provider-hithink";
+import "@ttsa/provider-rumik";
 
 let loaded = false;
 
