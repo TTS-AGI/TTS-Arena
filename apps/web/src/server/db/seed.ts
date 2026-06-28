@@ -33,6 +33,7 @@ import "@ttsa/provider-tontaube";
 import "@ttsa/provider-voiceai";
 import "@ttsa/provider-deepdub";
 import "@ttsa/provider-smallest";
+import "@ttsa/provider-hithink";
 import { db } from "./client";
 import { models } from "./schema";
 

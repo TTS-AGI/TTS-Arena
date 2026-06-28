@@ -17,6 +17,7 @@
     "@ttsa/provider-deepdub": "workspace:*",
     "@ttsa/provider-elevenlabs": "workspace:*",
     "@ttsa/provider-gradium": "workspace:*",
+    "@ttsa/provider-hithink": "workspace:*",
     "@ttsa/provider-hume": "workspace:*",
     "@ttsa/provider-inworld": "workspace:*",
     "@ttsa/provider-mars": "workspace:*",
