@@ -31,6 +31,7 @@
     "@ttsa/provider-hithink": "workspace:*",
     "@ttsa/provider-hume": "workspace:*",
     "@ttsa/provider-inworld": "workspace:*",
+    "@ttsa/provider-luna": "workspace:*",
     "@ttsa/provider-mars": "workspace:*",
     "@ttsa/provider-minimax": "workspace:*",
     "@ttsa/provider-rumik": "workspace:*",

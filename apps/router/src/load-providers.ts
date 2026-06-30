@@ -24,6 +24,7 @@ import "@ttsa/provider-deepdub";
 import "@ttsa/provider-smallest";
 import "@ttsa/provider-hithink";
 import "@ttsa/provider-rumik";
+import "@ttsa/provider-luna";
 
 let loaded = false;
 
