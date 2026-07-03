@@ -290,7 +290,7 @@ function IpLookup() {
         <input
           value={ip}
           onChange={(e) => setIp(e.target.value)}
-          placeholder="e.g. 23.249.17.75"
+          placeholder="e.g. 203.0.113.42"
           className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 font-mono text-sm outline-none focus:border-accent"
         />
         <button
