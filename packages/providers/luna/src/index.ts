@@ -70,6 +70,7 @@ registerArenaModels([
     id: "luna-tts",
     name: "Luna TTS",
     url: "https://www.vuilabs.ai/",
+    icon: "/logos/vuilabs.webp",
     open: false,
     provider: "vuilabs",
     routerModel: "luna-tts",
