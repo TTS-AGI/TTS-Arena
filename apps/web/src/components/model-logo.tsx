@@ -34,7 +34,7 @@ const FULL_BLEED = new Set([
   "/logos/papla.webp",
   "/logos/castleflow.webp",
   "/logos/vocu.webp",
-  // tontaube keeps the white tile (NOT full-bleed) — see DB icon.
+  "/logos/tontaube.webp",
 ]);
 
 /**

@@ -72,8 +72,9 @@ registerProvider(tontaube);
 registerArenaModels([
   {
     id: "tontaube",
-    name: "Tontaube",
+    name: "Tontaube V0",
     url: "https://tontaube.ai/",
+    icon: "/logos/tontaube.webp",
     open: false,
     provider: "tontaube",
     routerModel: "tontaube",
