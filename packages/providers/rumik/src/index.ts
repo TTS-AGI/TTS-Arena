@@ -1,16 +1,17 @@
 /**
  * Rumik TTS provider — Silk Mulberry 1.5.
  *
- * POST https://silk-api.rumik.ai/v1/tts with a Bearer key. The mulberry model
- * exposes four preset studio voices (speaker_1..4), which we rotate across
- * battles — no tone-tag injection or invented descriptions needed. Returns a
- * 24 kHz mono WAV.
+ * POST https://silk-api.rumik.ai/v1/tts with a Bearer key. The mulberry model is
+ * steered by a natural-language `description` rather than a preset speaker.
+ * Per Rumik (their engineer): the model defaults to an Indian accent, so the
+ * description must request "american accent." for English-arena evaluation, and
+ * max_new_tokens is raised to the API max (8192) so longer prompts aren't
+ * truncated. Returns a 24 kHz mono WAV.
  */
 import {
   ProviderError,
   env,
   httpFetch,
-  pickRandom,
   registerArenaModels,
   registerProvider,
   toBase64,
@@ -23,8 +24,9 @@ import {
 const ENDPOINT = "https://silk-api.rumik.ai/v1/tts";
 const ICON = "/logos/rumik.webp";
 const MODEL = "mulberry";
-
-const VOICES = ["speaker_1", "speaker_2", "speaker_3", "speaker_4"];
+// Rumik-specified voice steering (see file header).
+const DESCRIPTION = "american accent.";
+const MAX_NEW_TOKENS = 8192;
 
 function key() {
   return env("RUMIK_API_KEY");
@@ -45,10 +47,6 @@ export const rumik: TTSProvider = {
         "not_configured",
       );
     }
-    const voice =
-      input.voice && VOICES.includes(input.voice)
-        ? input.voice
-        : pickRandom(VOICES);
     const res = await httpFetch(
       ENDPOINT,
       {
@@ -60,7 +58,8 @@ export const rumik: TTSProvider = {
         body: JSON.stringify({
           text: input.text,
           model: MODEL,
-          speaker: voice,
+          description: DESCRIPTION,
+          max_new_tokens: MAX_NEW_TOKENS,
         }),
         timeoutMs: 120_000,
       },
@@ -69,7 +68,7 @@ export const rumik: TTSProvider = {
     return {
       audioBase64: toBase64(await res.arrayBuffer()),
       extension: "wav",
-      voice,
+      voice: DESCRIPTION,
       model: "silk-mulberry-1.5",
     };
   },
