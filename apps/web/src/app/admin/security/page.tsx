@@ -1,8 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import type { AdminSecurityOverview, AdminSecurityEvent } from "@ttsa/shared";
+import type {
+  AdminSecurityOverview,
+  AdminSecurityEvent,
+  AdminIpLookup,
+} from "@ttsa/shared";
 import { PageHeader, StatCard } from "@/components/admin/shell";
 import { fmtDate } from "@/components/admin/data-table";
 
@@ -60,6 +65,12 @@ export default function AdminSecurityPage() {
               value={data.totalVotes.toLocaleString()}
             />
           </div>
+
+          {/* Vote-ring alerts — the headline signal */}
+          <RingAlerts models={data.suspiciousModels} />
+
+          {/* IP lookup */}
+          <IpLookup />
 
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Events by severity */}
@@ -173,5 +184,165 @@ function EventRow({ e }: { e: AdminSecurityEvent }) {
         </p>
       )}
     </li>
+  );
+}
+
+/* ── Vote-ring alerts ─────────────────────────────────────────────────── */
+
+function RingAlerts({
+  models,
+}: {
+  models: AdminSecurityOverview["suspiciousModels"];
+}) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <p className="tag">Vote-ring alerts</p>
+        <span className="text-xs text-ink-3">
+          models with a cluster of anomalous voters
+        </span>
+      </div>
+      {models.length === 0 ? (
+        <p className="px-4 py-6 text-center text-sm text-ink-3">
+          No suspicious clusters — a lone superfan doesn’t trip this; it takes
+          several accounts converging on one model.
+        </p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {models.map((m) => (
+            <li key={m.modelId} className="px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/admin/models/${m.modelId}`}
+                  className="font-semibold hover:text-accent"
+                >
+                  {m.modelName}
+                </Link>
+                <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.7rem] font-medium text-accent">
+                  {m.anomalousAccounts} anomalous accounts
+                </span>
+                {m.sharedIpAccounts > 0 && (
+                  <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[0.7rem] font-medium text-amber-500">
+                    {m.sharedIpAccounts} share an IP
+                  </span>
+                )}
+                <span className="tag">max z {m.maxAnomalyZ.toFixed(1)}</span>
+                <span className="tag">
+                  ~{m.inflatedVotes.toLocaleString()} inflated votes
+                </span>
+              </div>
+              <ul className="mt-2 flex flex-col gap-1">
+                {m.accounts.map((a) => (
+                  <li
+                    key={a.userId}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <Link
+                      href={`/admin/users/${a.userId}`}
+                      className="text-ink-2 hover:text-accent"
+                    >
+                      @{a.username}
+                    </Link>
+                    <span className="flex items-center gap-3 text-xs text-ink-3">
+                      <span className="nums">
+                        {a.picks}/{a.battles} ({a.preferPct.toFixed(0)}%)
+                      </span>
+                      <span className="nums font-medium text-accent">
+                        z {a.anomalyZ.toFixed(1)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ── IP lookup ────────────────────────────────────────────────────────── */
+
+function IpLookup() {
+  const [ip, setIp] = useState("");
+  const [query, setQuery] = useState("");
+  const { data, isFetching } = useQuery({
+    queryKey: ["admin", "ip-lookup", query],
+    queryFn: async (): Promise<AdminIpLookup> => {
+      const res = await fetch(`/api/admin/ips?ip=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("failed");
+      return res.json();
+    },
+    enabled: query.length > 0,
+  });
+
+  return (
+    <div className="card p-4">
+      <p className="tag mb-3">Look up accounts by IP</p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setQuery(ip.trim());
+        }}
+        className="flex gap-2"
+      >
+        <input
+          value={ip}
+          onChange={(e) => setIp(e.target.value)}
+          placeholder="e.g. 23.249.17.75"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 font-mono text-sm outline-none focus:border-accent"
+        />
+        <button
+          type="submit"
+          className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-on-accent"
+        >
+          Search
+        </button>
+      </form>
+
+      {query && (
+        <div className="mt-3">
+          {isFetching ? (
+            <p className="text-sm text-ink-3">Searching…</p>
+          ) : !data || data.accounts.length === 0 ? (
+            <p className="text-sm text-ink-3">
+              No accounts have logged in from {query}.
+            </p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {data.accounts.map((a) => (
+                <li key={a.userId} className="py-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <Link
+                      href={`/admin/users/${a.userId}`}
+                      className="font-medium hover:text-accent"
+                    >
+                      {a.username}
+                    </Link>
+                    <span className="flex items-center gap-2 text-xs text-ink-3">
+                      {a.quarantined && (
+                        <span className="text-accent">quarantined</span>
+                      )}
+                      <span className="nums">
+                        {a.totalVotes.toLocaleString()} votes
+                      </span>
+                      <span className="tag">
+                        trust {a.trustScore.toFixed(0)}
+                      </span>
+                    </span>
+                  </div>
+                  {a.otherIps.length > 0 && (
+                    <p className="mt-0.5 truncate font-mono text-[0.7rem] text-ink-3">
+                      also: {a.otherIps.join(", ")}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

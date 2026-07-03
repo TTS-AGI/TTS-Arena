@@ -123,34 +123,54 @@ export default function AdminModelDetailPage({
             />
           )}
 
-          {/* Top voters — fraud lens (flagged share). */}
+          {/* Top voters — fraud lens: preference + anomaly vs the crowd. */}
           {data.topVoters.length > 0 && (
             <div className="card overflow-hidden">
-              <p className="tag border-b border-line px-4 py-3">
-                Top voters for this model
-              </p>
+              <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                <p className="tag">Top voters for this model</p>
+                <span className="text-xs text-ink-3">
+                  picks / battles · anomaly (z)
+                </span>
+              </div>
               <ul className="divide-y divide-line">
-                {data.topVoters.map((v) => (
-                  <li
-                    key={v.userId}
-                    className="flex items-center justify-between px-4 py-2 text-sm"
-                  >
-                    <Link
-                      href={`/admin/users/${v.userId}`}
-                      className="font-medium hover:text-accent"
+                {data.topVoters.map((v) => {
+                  const hot = v.anomalyZ >= 4 && v.preferPct >= 85;
+                  return (
+                    <li
+                      key={v.userId}
+                      className="flex items-center justify-between px-4 py-2 text-sm"
                     >
-                      {v.username}
-                    </Link>
-                    <span className="text-ink-3">
-                      {v.votes} votes
-                      {v.flagged > 0 && (
-                        <span className="ml-2 text-accent">
-                          {v.flagged} flagged
+                      <span className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/users/${v.userId}`}
+                          className="font-medium hover:text-accent"
+                        >
+                          {v.username}
+                        </Link>
+                        {v.quarantined && (
+                          <span className="text-xs text-ink-3">
+                            (quarantined)
+                          </span>
+                        )}
+                        {v.flagged > 0 && (
+                          <span className="text-xs text-accent">
+                            {v.flagged} flagged
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-3 text-xs text-ink-3">
+                        <span className="nums">
+                          {v.votes}/{v.battles} ({v.preferPct.toFixed(0)}%)
                         </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
+                        <span
+                          className={`nums font-medium ${hot ? "text-accent" : "text-ink-4"}`}
+                        >
+                          z {v.anomalyZ.toFixed(1)}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

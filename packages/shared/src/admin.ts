@@ -219,8 +219,18 @@ export const adminModelDetailSchema = z.object({
     z.object({
       userId: z.number().int(),
       username: z.string(),
+      /** Times this user picked the model (wins for the model). */
       votes: z.number().int(),
       flagged: z.number().int(),
+      /** Total battles this user had with the model (wins + losses). */
+      battles: z.number().int(),
+      /** Share (0–100) of those battles where they picked the model. */
+      preferPct: z.number(),
+      /** Anomaly of their preference vs the model's global pick rate, in
+       *  standard deviations. High = this user favors the model far more than
+       *  the crowd (a manipulation signal). */
+      anomalyZ: z.number(),
+      quarantined: z.boolean(),
     }),
   ),
   recentVotes: z.array(adminVoteRowSchema),
@@ -265,8 +275,59 @@ export const adminSecurityOverviewSchema = z.object({
       trustScore: z.number(),
     }),
   ),
+  /** Model-centric manipulation alert: models with a *cluster* of accounts
+   *  whose preference is anomalously high vs the crowd. One anomalous account
+   *  is usually a superfan; several converging on one model — especially
+   *  sharing IPs — is a vote ring. */
+  suspiciousModels: z.array(
+    z.object({
+      modelId: z.string(),
+      modelName: z.string(),
+      /** Number of distinct accounts with anomalous preference for this model. */
+      anomalousAccounts: z.number().int(),
+      /** How many of those accounts share an IP with another flagged account
+       *  (the coordination signal that separates a ring from lone superfans). */
+      sharedIpAccounts: z.number().int(),
+      /** Highest per-account anomaly (standard deviations). */
+      maxAnomalyZ: z.number(),
+      /** Total picks from these accounts — votes potentially inflating the rating. */
+      inflatedVotes: z.number().int(),
+      accounts: z.array(
+        z.object({
+          userId: z.number().int(),
+          username: z.string(),
+          picks: z.number().int(),
+          battles: z.number().int(),
+          preferPct: z.number(),
+          anomalyZ: z.number(),
+          quarantined: z.boolean(),
+        }),
+      ),
+    }),
+  ),
 });
 export type AdminSecurityOverview = z.infer<typeof adminSecurityOverviewSchema>;
+
+/* ── IP lookup ────────────────────────────────────────────────────────── */
+
+export const adminIpLookupSchema = z.object({
+  ip: z.string(),
+  accounts: z.array(
+    z.object({
+      userId: z.number().int(),
+      username: z.string(),
+      joinDate: z.number().int().nullable(),
+      trustScore: z.number(),
+      quarantined: z.boolean(),
+      logins: z.number().int(),
+      totalVotes: z.number().int(),
+      lastSeen: z.number().int().nullable(),
+      /** Other IPs this account has logged in from (pivot for wider rings). */
+      otherIps: z.array(z.string()),
+    }),
+  ),
+});
+export type AdminIpLookup = z.infer<typeof adminIpLookupSchema>;
 
 export const adminSecurityEventsResponseSchema = z.object({
   rows: z.array(adminSecurityEventSchema),

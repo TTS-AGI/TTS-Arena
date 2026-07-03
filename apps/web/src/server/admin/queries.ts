@@ -4,7 +4,7 @@
  * requireAdmin). Timestamps are returned as unix-epoch seconds (the column
  * mode is "timestamp" → JS Date; we convert to epoch for the JSON contract).
  */
-import { and, asc, desc, eq, isNotNull, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, like, sql } from "drizzle-orm";
 import type {
   AdminAnalytics,
   AdminErrorOverview,
@@ -12,6 +12,7 @@ import type {
   AdminGenerationOverview,
   AdminGenerationRow,
   AdminGenModelStat,
+  AdminIpLookup,
   AdminModel,
   AdminOverview,
   AdminSecurityEvent,
@@ -547,20 +548,37 @@ export async function modelDetail(
     .sort((a, b) => b.wins + b.losses - (a.wins + a.losses))
     .slice(0, 10);
 
-  // Top voters for this model (chose it) + their flagged share.
+  // Top voters for this model (chose it) + their flagged share, win rate for
+  // the model, and an anomaly score vs the model's global pick rate. A single
+  // high-anomaly voter is usually a genuine superfan; a *cluster* of them is
+  // the manipulation signal (see suspiciousModels()).
   const voterRows = await db
     .select({
       userId: votes.userId,
       username: users.username,
+      quarantined: users.quarantined,
       votes: sql<number>`count(*)`,
       flagged: sql<number>`sum(case when ${votes.flagged} then 1 else 0 end)`,
     })
     .from(votes)
     .innerJoin(users, eq(votes.userId, users.id))
-    .where(eq(votes.chosenModelId, id))
-    .groupBy(votes.userId, users.username)
+    .where(and(eq(votes.chosenModelId, id), eq(votes.countsForPublic, true)))
+    .groupBy(votes.userId, users.username, users.quarantined)
     .orderBy(sql`count(*) desc`)
     .limit(10);
+  // Per-user losses (they saw the model but picked the opponent) → battle total.
+  const voterLossRows = await db
+    .select({ userId: votes.userId, losses: sql<number>`count(*)` })
+    .from(votes)
+    .where(and(eq(votes.rejectedModelId, id), eq(votes.countsForPublic, true)))
+    .groupBy(votes.userId);
+  const lossByUser = new Map(
+    voterLossRows.map((r) => [r.userId, Number(r.losses)]),
+  );
+  // The model's global counting pick rate, from the vs-opponent totals.
+  const gWins = winsRows.reduce((s, r) => s + Number(r.c), 0);
+  const gLoss = lossRows.reduce((s, r) => s + Number(r.c), 0);
+  const pModel = gWins + gLoss > 0 ? gWins / (gWins + gLoss) : 0.5;
 
   // Recent votes involving this model.
   const recent = await db
@@ -596,12 +614,23 @@ export async function modelDetail(
     })),
     votesByDay: byDay,
     vsOpponents,
-    topVoters: voterRows.map((v) => ({
-      userId: v.userId,
-      username: v.username,
-      votes: v.votes,
-      flagged: v.flagged ?? 0,
-    })),
+    topVoters: voterRows.map((v) => {
+      const k = Number(v.votes);
+      const battles = k + (lossByUser.get(v.userId) ?? 0);
+      const preferPct = battles > 0 ? (k / battles) * 100 : 0;
+      const sd = Math.sqrt(battles * pModel * (1 - pModel));
+      const anomalyZ = sd > 0 ? (k - battles * pModel) / sd : 0;
+      return {
+        userId: v.userId,
+        username: v.username,
+        votes: k,
+        flagged: Number(v.flagged ?? 0),
+        battles,
+        preferPct,
+        anomalyZ,
+        quarantined: v.quarantined,
+      };
+    }),
     recentVotes: recent.map((r) => ({
       id: r.id,
       createdAt: epoch(r.createdAt),
@@ -850,6 +879,217 @@ export async function securityOverview(): Promise<AdminSecurityOverview> {
       id: q.id,
       username: q.username,
       trustScore: q.trustScore,
+    })),
+    suspiciousModels: await suspiciousModels(),
+  };
+}
+
+/* Detection tuning. A pair (user, model) is "anomalous" when the user's
+ * preference for the model is both statistically extreme (ANOMALY_Z sigma above
+ * the crowd's pick rate for that model) AND lopsided in absolute terms
+ * (PREFER_MIN). A single such account is usually a genuine superfan — so we only
+ * ALERT on a model once RING_MIN of them converge on it. This is intentionally
+ * surfacing-only: nothing here flags votes, lowers trust, or quarantines. */
+const ANOMALY = {
+  minBattles: 20, // ignore thin samples
+  z: 4, // sigma above the model's global pick rate
+  preferMin: 0.85, // ≥85% of their battles with the model
+  ringMin: 2, // this many anomalous accounts on one model = alert
+} as const;
+
+type AnomRow = {
+  user_id: number;
+  username: string;
+  model_id: string;
+  n: number;
+  k: number;
+  z: number;
+};
+
+/**
+ * Model-centric vote-ring detection (alert-only, read-only). Finds models with
+ * a cluster of accounts whose preference is anomalously high vs the crowd, and
+ * corroborates with shared-IP coordination. Does NOT mutate anything.
+ */
+export async function suspiciousModels(): Promise<
+  AdminSecurityOverview["suspiciousModels"]
+> {
+  // Per (user, model): battles n and picks k, scored against the model's global
+  // counting pick rate. Excludes already-quarantined users (handled elsewhere).
+  const res = await db.execute<AnomRow>(sql`
+    with model_global as (
+      select m.id,
+             count(*) filter (where v.chosen_model_id = m.id)::float
+               / nullif(count(*), 0) as p
+      from models m
+      join votes v
+        on (v.chosen_model_id = m.id or v.rejected_model_id = m.id)
+      where v.counts_for_public = true
+      group by m.id
+    ),
+    um as (
+      select v.user_id, m.id as model_id,
+             count(*) as n,
+             count(*) filter (where v.chosen_model_id = m.id) as k
+      from models m
+      join votes v
+        on (v.chosen_model_id = m.id or v.rejected_model_id = m.id)
+      join users u on u.id = v.user_id
+      where v.counts_for_public = true and u.quarantined = false
+      group by v.user_id, m.id
+      having count(*) >= ${ANOMALY.minBattles}
+    )
+    select um.user_id, uu.username, um.model_id, um.n, um.k,
+           (um.k - um.n * mg.p) / sqrt(um.n * mg.p * (1 - mg.p)) as z
+    from um
+    join model_global mg on mg.id = um.model_id
+    join users uu on uu.id = um.user_id
+    where mg.p between 0.05 and 0.95
+      and um.k::float / um.n >= ${ANOMALY.preferMin}
+      and (um.k - um.n * mg.p) / sqrt(um.n * mg.p * (1 - mg.p)) >= ${ANOMALY.z}
+    order by z desc
+  `);
+  const rows = (res as unknown as { rows: AnomRow[] }).rows.map((r) => ({
+    ...r,
+    n: Number(r.n),
+    k: Number(r.k),
+    z: Number(r.z),
+  }));
+  if (rows.length === 0) return [];
+
+  // Group anomalous accounts by model.
+  const byModel = new Map<string, AnomRow[]>();
+  for (const r of rows) {
+    const list = byModel.get(r.model_id) ?? [];
+    list.push(r);
+    byModel.set(r.model_id, list);
+  }
+
+  // Shared-IP corroboration: which of these flagged accounts share an IP with
+  // another flagged account? (The signature that separates a ring from a set of
+  // independent superfans.)
+  const flaggedIds = [...new Set(rows.map((r) => r.user_id))];
+  const ipRows = await db
+    .selectDistinct({ userId: userLogins.userId, ip: userLogins.ip })
+    .from(userLogins)
+    .where(
+      and(inArray(userLogins.userId, flaggedIds), isNotNull(userLogins.ip)),
+    );
+  const ipToUsers = new Map<string, Set<number>>();
+  for (const r of ipRows) {
+    if (!r.ip) continue;
+    const set = ipToUsers.get(r.ip) ?? new Set<number>();
+    set.add(r.userId);
+    ipToUsers.set(r.ip, set);
+  }
+  // A user "shares" if any of their IPs is used by ≥2 flagged users.
+  const sharesIp = new Set<number>();
+  for (const users of ipToUsers.values()) {
+    if (users.size >= 2) for (const u of users) sharesIp.add(u);
+  }
+
+  const nameById = new Map((await listModels()).map((m) => [m.id, m.name]));
+
+  const out = [...byModel.entries()]
+    .filter(([, accts]) => accts.length >= ANOMALY.ringMin)
+    .map(([modelId, accts]) => {
+      const flaggedUsers = new Set(accts.map((a) => a.user_id));
+      return {
+        modelId,
+        modelName: nameById.get(modelId) ?? modelId,
+        anomalousAccounts: accts.length,
+        sharedIpAccounts: [...flaggedUsers].filter((u) => sharesIp.has(u))
+          .length,
+        maxAnomalyZ: Math.max(...accts.map((a) => a.z)),
+        inflatedVotes: accts.reduce((s, a) => s + a.k, 0),
+        accounts: accts
+          .sort((a, b) => b.z - a.z)
+          .map((a) => ({
+            userId: a.user_id,
+            username: a.username,
+            picks: a.k,
+            battles: a.n,
+            preferPct: (a.k / a.n) * 100,
+            anomalyZ: a.z,
+            quarantined: false,
+          })),
+      };
+    })
+    // Rings first (most accounts, then most shared-IP corroboration).
+    .sort(
+      (a, b) =>
+        b.anomalousAccounts - a.anomalousAccounts ||
+        b.sharedIpAccounts - a.sharedIpAccounts ||
+        b.maxAnomalyZ - a.maxAnomalyZ,
+    );
+  return out;
+}
+
+/**
+ * All accounts that have logged in from an exact IP, with vote counts and the
+ * other IPs each has used (to pivot outward to a wider ring).
+ */
+export async function usersByIp(ip: string): Promise<AdminIpLookup> {
+  const trimmed = ip.trim();
+  if (!trimmed) return { ip: trimmed, accounts: [] };
+
+  const idRows = await db
+    .selectDistinct({ userId: userLogins.userId })
+    .from(userLogins)
+    .where(eq(userLogins.ip, trimmed));
+  const ids = idRows.map((r) => r.userId);
+  if (ids.length === 0) return { ip: trimmed, accounts: [] };
+
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      joinDate: users.joinDate,
+      trustScore: users.trustScore,
+      quarantined: users.quarantined,
+      logins: sql<number>`count(distinct ${userLogins.id})`,
+      lastSeen: sql<number>`extract(epoch from max(${userLogins.createdAt}))`,
+      totalVotes: sql<number>`(select count(*) from ${votes} where ${votes.userId} = ${users.id})`,
+    })
+    .from(users)
+    .innerJoin(userLogins, eq(userLogins.userId, users.id))
+    .where(inArray(users.id, ids))
+    .groupBy(
+      users.id,
+      users.username,
+      users.joinDate,
+      users.trustScore,
+      users.quarantined,
+    )
+    .orderBy(sql`count(distinct ${userLogins.id}) desc`);
+
+  // Each account's full IP set (so the admin can pivot to related IPs).
+  const allIps = await db
+    .select({ userId: userLogins.userId, ip: userLogins.ip })
+    .from(userLogins)
+    .where(and(inArray(userLogins.userId, ids), isNotNull(userLogins.ip)));
+  const ipsByUser = new Map<number, Set<string>>();
+  for (const r of allIps) {
+    if (!r.ip) continue;
+    const set = ipsByUser.get(r.userId) ?? new Set<string>();
+    set.add(r.ip);
+    ipsByUser.set(r.userId, set);
+  }
+
+  return {
+    ip: trimmed,
+    accounts: rows.map((r) => ({
+      userId: r.id,
+      username: r.username,
+      joinDate: r.joinDate ? epoch(r.joinDate) : null,
+      trustScore: r.trustScore,
+      quarantined: r.quarantined,
+      logins: Number(r.logins),
+      totalVotes: Number(r.totalVotes),
+      lastSeen: r.lastSeen ? Number(r.lastSeen) : null,
+      otherIps: [...(ipsByUser.get(r.id) ?? new Set())].filter(
+        (x) => x !== trimmed,
+      ),
     })),
   };
 }
