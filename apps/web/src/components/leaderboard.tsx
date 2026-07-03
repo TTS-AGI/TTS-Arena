@@ -53,6 +53,8 @@ export function Leaderboard() {
   const sorted = useMemo(() => {
     if (!rows) return [];
     return [...rows].sort((a, b) => {
+      // Suspended (delisted) models always sink to the bottom, whatever the sort.
+      if (a.suspended !== b.suspended) return a.suspended ? 1 : -1;
       if (sort === "elo") return a.rank - b.rank;
       return b[sort] - a[sort] || a.rank - b.rank;
     });
@@ -138,7 +140,7 @@ export function Leaderboard() {
             <Row
               key={m.id}
               model={m}
-              displayRank={i + 1}
+              displayRank={m.suspended ? null : i + 1}
               sort={sort}
               eloRange={eloRange}
               onStealthClick={() => setStealthOpen(true)}
@@ -160,7 +162,7 @@ function Row({
   onStealthClick,
 }: {
   model: LeaderboardRow;
-  displayRank: number;
+  displayRank: number | null;
   sort: SortKey;
   eloRange: { min: number; max: number };
   onStealthClick: () => void;
@@ -177,18 +179,28 @@ function Row({
   const valueLabel =
     sort === "elo" ? "rating" : sort === "winRate" ? "win rate" : "votes";
 
+  const suspendedTitle = model.suspended
+    ? `Suspended${model.suspendedAt ? ` on ${new Date(model.suspendedAt * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}` : ""}${model.suspendedReason ? ` for ${model.suspendedReason}` : ""}.`
+    : "";
+
   return (
-    <div className="relative flex items-center gap-3 px-4 py-3.5">
-      <span
-        className="pointer-events-none absolute inset-y-1 left-1 rounded-[0.6rem] bg-accent-soft opacity-60"
-        style={{ width: `calc((100% - 0.5rem) * ${0.12 + eloFrac * 0.88})` }}
-      />
+    <div
+      className={`relative flex items-center gap-3 px-4 py-3.5 ${model.suspended ? "opacity-55" : ""}`}
+    >
+      {!model.suspended && (
+        <span
+          className="pointer-events-none absolute inset-y-1 left-1 rounded-[0.6rem] bg-accent-soft opacity-60"
+          style={{ width: `calc((100% - 0.5rem) * ${0.12 + eloFrac * 0.88})` }}
+        />
+      )}
       <span
         className={`nums relative w-6 text-center text-sm font-semibold ${
-          displayRank <= 3 ? "text-accent" : "text-ink-4"
+          displayRank !== null && displayRank <= 3
+            ? "text-accent"
+            : "text-ink-4"
         }`}
       >
-        {displayRank}
+        {displayRank ?? "—"}
       </span>
 
       <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
@@ -224,12 +236,20 @@ function Row({
                 Preliminary
               </span>
             )}
-            {!model.active && (
+            {!model.active && !model.suspended && (
               <span
                 className="shrink-0 rounded-full border border-line bg-sunk px-2 py-0.5 text-[0.7rem] font-medium text-ink-3"
                 title="This model has been retired and is no longer in rotation. Its rating is preserved from past votes."
               >
                 Retired
+              </span>
+            )}
+            {model.suspended && (
+              <span
+                className="shrink-0 cursor-help rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[0.7rem] font-medium text-red-500"
+                title={suspendedTitle}
+              >
+                Suspended
               </span>
             )}
           </div>

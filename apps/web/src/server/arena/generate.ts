@@ -5,7 +5,7 @@
  * URLs, never identities.
  */
 import type { ArenaModelDTO, ModelType } from "@ttsa/shared";
-import { and, gt, isNotNull } from "drizzle-orm";
+import { and, gt, isNotNull, or } from "drizzle-orm";
 import { db } from "../db/client";
 import { models, votes } from "../db/schema";
 import { synthesize } from "../router-client";
@@ -17,15 +17,22 @@ import { logGenerationEvent } from "../observability/generation";
 
 const SMOOTHING = 500;
 
-/** Ids of models currently timed out (timedOutUntil in the future). */
-async function timedOutModelIds(): Promise<Set<string>> {
+/**
+ * Ids of models suppressed from battles: temporarily timed out (timedOutUntil in
+ * the future) OR suspended for misconduct (suspendedAt set). Both are web-side
+ * admin concepts the router doesn't know about, so we filter the catalog here.
+ */
+async function suppressedModelIds(): Promise<Set<string>> {
   const rows = await db
     .select({ id: models.id })
     .from(models)
     .where(
-      and(
-        isNotNull(models.timedOutUntil),
-        gt(models.timedOutUntil, new Date()),
+      or(
+        and(
+          isNotNull(models.timedOutUntil),
+          gt(models.timedOutUntil, new Date()),
+        ),
+        isNotNull(models.suspendedAt),
       ),
     );
   return new Set(rows.map((r) => r.id));
@@ -87,11 +94,10 @@ export async function generateBattle(params: {
   // so timed-out models keep their rows/metadata.)
   await ensureModelsSeeded(fullCatalog);
 
-  // Drop models an admin has temporarily timed out (suppressed from battles
-  // until timedOutUntil). This is a web-side admin concept the router doesn't
-  // know about, so we filter the catalog here.
-  const timedOut = await timedOutModelIds();
-  const catalog = fullCatalog.filter((m) => !timedOut.has(m.id));
+  // Drop models suppressed from battles — temporarily timed out, or suspended
+  // for misconduct. Web-side admin concepts the router doesn't know about.
+  const suppressed = await suppressedModelIds();
+  const catalog = fullCatalog.filter((m) => !suppressed.has(m.id));
   if (catalog.length < 2) {
     throw new Error("Not enough models are available right now");
   }

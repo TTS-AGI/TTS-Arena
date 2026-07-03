@@ -84,6 +84,14 @@ export const models = pgTable("models", {
    * hours). Distinct from isActive, which is a manual on/off the admin controls.
    */
   timedOutUntil: timestamp("timed_out_until"),
+  /**
+   * Suspension: when set, the model was pulled for misconduct (e.g. vote
+   * manipulation). It's removed from battles and from the ranked board, but —
+   * unlike a delete — its row and votes are preserved as evidence, and it shows
+   * on the board with a "Suspended" badge explaining why/when.
+   */
+  suspendedAt: timestamp("suspended_at"),
+  suspendedReason: text("suspended_reason"),
   url: text("url"),
   /** Optional provider logo URL shown on the leaderboard. */
   icon: text("icon"),

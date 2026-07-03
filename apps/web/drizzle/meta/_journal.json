@@ -15,6 +15,13 @@
       "when": 1780871298168,
       "tag": "0001_cloudy_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783097316584,
+      "tag": "0002_useful_the_leader",
+      "breakpoints": true
     }
   ]
 }

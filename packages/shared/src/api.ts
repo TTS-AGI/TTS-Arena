@@ -114,6 +114,16 @@ export const leaderboardRowSchema = z.object({
    * (no longer battled). The UI badges these "no longer active".
    */
   active: z.boolean(),
+  /**
+   * True when the model was pulled for misconduct (e.g. vote manipulation). It's
+   * delisted from the ranking (rank 0) and shown with a "Suspended" badge; its
+   * row and votes are preserved as evidence.
+   */
+  suspended: z.boolean(),
+  /** Unix seconds when suspended (for the badge tooltip). */
+  suspendedAt: z.number().int().nullable(),
+  /** Human-readable suspension reason (badge tooltip). */
+  suspendedReason: z.string().nullable(),
 });
 export type LeaderboardRow = z.infer<typeof leaderboardRowSchema>;
 

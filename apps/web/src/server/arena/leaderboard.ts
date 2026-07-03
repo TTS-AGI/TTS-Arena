@@ -51,6 +51,7 @@ export async function getLeaderboard(
     const btr = bt.get(m.id);
     const games = btr?.games ?? 0;
     const wins = btr?.wins ?? 0;
+    const suspended = m.suspendedAt != null;
 
     // Display rating + ranking lower bound + ± uncertainty. Prefer the single
     // BT fit for everyone (rank by its CI lower bound); fall back to live
@@ -85,22 +86,39 @@ export async function getLeaderboard(
       open: m.isOpen,
       preliminary: !isEstablished(games),
       active: m.isActive,
+      suspended,
+      suspendedAt: m.suspendedAt ? Math.floor(m.suspendedAt.getTime() / 1000) : null,
+      suspendedReason: m.suspendedReason ?? null,
     };
   });
 
-  // Rank by the conservative lower bound (good AND certain), then strip it —
-  // it's an internal sort key, not part of the public row.
-  rows.sort(
-    (a, b) =>
-      b.lowerBound - a.lowerBound ||
-      b.elo - a.elo ||
-      b.totalVotes - a.totalVotes ||
-      a.id.localeCompare(b.id),
-  );
+  // Rank by the conservative lower bound (good AND certain), then strip it — it's
+  // an internal sort key, not part of the public row. Suspended models are pulled
+  // out of the ranking and listed (delisted, badged) after the ranked ones — kept
+  // visible for transparency but never occupying a competitive position.
+  const ranked = rows
+    .filter((r) => !r.suspended)
+    .sort(
+      (a, b) =>
+        b.lowerBound - a.lowerBound ||
+        b.elo - a.elo ||
+        b.totalVotes - a.totalVotes ||
+        a.id.localeCompare(b.id),
+    );
+  const suspendedRows = rows
+    .filter((r) => r.suspended)
+    .sort((a, b) => (b.suspendedAt ?? 0) - (a.suspendedAt ?? 0));
 
-  return rows.map((row, i) => {
-    const { lowerBound, ...r } = row;
-    void lowerBound;
-    return { rank: i + 1, tier: tierFor(i + 1), ...r };
-  });
+  return [
+    ...ranked.map((row, i) => {
+      const { lowerBound, ...r } = row;
+      void lowerBound;
+      return { rank: i + 1, tier: tierFor(i + 1), ...r };
+    }),
+    ...suspendedRows.map((row) => {
+      const { lowerBound, ...r } = row;
+      void lowerBound;
+      return { rank: 0, tier: tierFor(999), ...r };
+    }),
+  ];
 }
