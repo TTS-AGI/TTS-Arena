@@ -15,7 +15,7 @@ import { getSession, deleteSession } from "@/server/arena/session-store";
 import { recordVote } from "@/server/arena/vote";
 import { assessVote, SECURITY } from "@/server/arena/security";
 import { latestFingerprint } from "@/server/auth/logins";
-import { verifyCapToken } from "@/server/security/cap";
+import { verifyHcaptcha } from "@/server/security/hcaptcha";
 import { errInfo, logErrorEvent } from "@/server/observability/errors";
 import { db } from "@/server/db/client";
 import { models } from "@/server/db/schema";
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   // tip-off, low friction).
   const cookieStore = await cookies();
   const capToken = req.headers.get("x-cap-token");
-  const captchaOk = await verifyCapToken(capToken);
+  const captchaOk = await verifyHcaptcha(capToken);
   const alreadySolvedThisSession = cookieStore.get(CAP_COOKIE)?.value === "1";
 
   let captchaRequired = false;

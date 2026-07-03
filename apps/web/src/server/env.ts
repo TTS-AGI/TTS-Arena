@@ -71,6 +71,11 @@ export const serverEnv = {
     url: () => optional("ROUTER_URL") ?? "http://localhost:8080",
     apiKey: () => optional("ROUTER_API_KEY"),
   },
+
+  /** hCaptcha secret for server-side token verification (siteverify). When
+   *  unset, captcha verification is treated as unavailable (fails closed only
+   *  where a captcha is required). */
+  hcaptchaSecret: () => optional("HCAPTCHA_SECRET"),
 };
 
 export function isAdmin(username: string): boolean {

@@ -65,9 +65,8 @@
       "version": "0.1.0",
       "dependencies": {
         "@base-ui-components/react": "1.0.0-beta.1",
-        "@cap.js/server": "^4.0.5",
-        "@cap.js/widget": "^0.1.55",
         "@fingerprintjs/fingerprintjs": "^5.2.0",
+        "@hcaptcha/react-hcaptcha": "^2.0.2",
         "@tanstack/react-query": "^5.101.0",
         "@tanstack/react-table": "^8.21.3",
         "@ttsa/provider-cartesia": "packages/providers/cartesia",
@@ -242,10 +241,6 @@
 
     "@base-ui-components/react": ["@base-ui-components/react@1.0.0-beta.1", "", { "dependencies": { "@babel/runtime": "^7.27.6", "@floating-ui/react-dom": "^2.1.3", "@floating-ui/utils": "^0.2.9", "reselect": "^5.1.1", "tabbable": "^6.2.0", "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-7zmGiz4/+HKnv99lWftItoSMqnj2PdSvt2krh0/GP+Rj0xK0NMnFI/gIVvP7CB2G+k0JPUrRWXjXa3y08oiakg=="],
 
-    "@cap.js/server": ["@cap.js/server@4.0.5", "", {}, "sha512-S902YIyGyiriNaexfqTzMy5ixxSb3/jYSJwr2gAY9d7XXoYftcifgij/11pjuiU72Ogm6XKZOggDB2DtjRMyww=="],
-
-    "@cap.js/widget": ["@cap.js/widget@0.1.55", "", {}, "sha512-QP+QQh66q8ygzIFoKDcNCTfmGXlPx1i2gxDLE9B0n36GVwluKTsd7t/A5D69nay5Z+lT2pwsGfZHehZ4b3Nd+w=="],
-
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
@@ -339,6 +334,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
     "@fumadocs/tailwind": ["@fumadocs/tailwind@0.0.5", "", { "peerDependencies": { "@tailwindcss/oxide": "^4.0.0", "tailwindcss": "^4.0.0" }, "optionalPeers": ["@tailwindcss/oxide", "tailwindcss"] }, "sha512-ENKPWUDRmriccsrUDE4bDBq3FNr/ms3BP2rWlsAEMV1yP23pcCaan+ceGfeBUsAQjw7sj9Q3R4Kl3g/TCStPzQ=="],
+
+    "@hcaptcha/react-hcaptcha": ["@hcaptcha/react-hcaptcha@2.0.2", "", {}, "sha512-VbuH6VJ6m3BHmVBHs0fL9t+suZd7PQEqCzqL2BiUbBvbHI3XfvSgdiug2QiEPN8zskbPTIV/FfGPF53JCckrow=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.2", "", { "dependencies": { "@humanfs/types": "^0.15.0" } }, "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA=="],
 
@@ -622,7 +619,7 @@
 
     "@ttsa/shared": ["@ttsa/shared@workspace:packages/shared", { "dependencies": { "zod": "^3.24.1" } }],
 
-    "@ttsa/web": ["@ttsa/web@workspace:apps/web", { "dependencies": { "@base-ui-components/react": "1.0.0-beta.1", "@cap.js/server": "^4.0.5", "@cap.js/widget": "^0.1.55", "@fingerprintjs/fingerprintjs": "^5.2.0", "@tanstack/react-query": "^5.101.0", "@tanstack/react-table": "^8.21.3", "@ttsa/provider-cartesia": "packages/providers/cartesia", "@ttsa/provider-chatterbox": "packages/providers/chatterbox", "@ttsa/provider-deepdub": "packages/providers/deepdub", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-gradium": "packages/providers/gradium", "@ttsa/provider-hithink": "packages/providers/hithink", "@ttsa/provider-hume": "packages/providers/hume", "@ttsa/provider-inworld": "packages/providers/inworld", "@ttsa/provider-luna": "packages/providers/luna", "@ttsa/provider-mars": "packages/providers/mars", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-rumik": "packages/providers/rumik", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/provider-smallest": "packages/providers/smallest", "@ttsa/provider-tontaube": "packages/providers/tontaube", "@ttsa/provider-typecast": "packages/providers/typecast", "@ttsa/provider-voiceai": "packages/providers/voiceai", "@ttsa/shared": "packages/shared", "drizzle-orm": "^0.38.3", "jose": "^5.9.6", "lucide-react": "^1.17.0", "motion": "^11.15.0", "next": "15.1.6", "pg": "^8.13.1", "react": "^19.2.0", "react-dom": "^19.2.0", "recharts": "^3.8.1", "wavesurfer.js": "^7.12.7", "zod": "^3.24.1" }, "devDependencies": { "@tailwindcss/postcss": "^4.0.0", "@types/pg": "^8.11.10", "@types/react": "^19.0.7", "@types/react-dom": "^19.0.3", "drizzle-kit": "^0.30.1", "eslint": "^9", "eslint-config-next": "15.1.6", "tailwindcss": "^4.0.0" } }],
+    "@ttsa/web": ["@ttsa/web@workspace:apps/web", { "dependencies": { "@base-ui-components/react": "1.0.0-beta.1", "@fingerprintjs/fingerprintjs": "^5.2.0", "@hcaptcha/react-hcaptcha": "^2.0.2", "@tanstack/react-query": "^5.101.0", "@tanstack/react-table": "^8.21.3", "@ttsa/provider-cartesia": "packages/providers/cartesia", "@ttsa/provider-chatterbox": "packages/providers/chatterbox", "@ttsa/provider-deepdub": "packages/providers/deepdub", "@ttsa/provider-elevenlabs": "packages/providers/elevenlabs", "@ttsa/provider-gradium": "packages/providers/gradium", "@ttsa/provider-hithink": "packages/providers/hithink", "@ttsa/provider-hume": "packages/providers/hume", "@ttsa/provider-inworld": "packages/providers/inworld", "@ttsa/provider-luna": "packages/providers/luna", "@ttsa/provider-mars": "packages/providers/mars", "@ttsa/provider-minimax": "packages/providers/minimax", "@ttsa/provider-rumik": "packages/providers/rumik", "@ttsa/provider-sdk": "packages/provider-sdk", "@ttsa/provider-smallest": "packages/providers/smallest", "@ttsa/provider-tontaube": "packages/providers/tontaube", "@ttsa/provider-typecast": "packages/providers/typecast", "@ttsa/provider-voiceai": "packages/providers/voiceai", "@ttsa/shared": "packages/shared", "drizzle-orm": "^0.38.3", "jose": "^5.9.6", "lucide-react": "^1.17.0", "motion": "^11.15.0", "next": "15.1.6", "pg": "^8.13.1", "react": "^19.2.0", "react-dom": "^19.2.0", "recharts": "^3.8.1", "wavesurfer.js": "^7.12.7", "zod": "^3.24.1" }, "devDependencies": { "@tailwindcss/postcss": "^4.0.0", "@types/pg": "^8.11.10", "@types/react": "^19.0.7", "@types/react-dom": "^19.0.3", "drizzle-kit": "^0.30.1", "eslint": "^9", "eslint-config-next": "15.1.6", "tailwindcss": "^4.0.0" } }],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-RoBvJ2X0wuKlWFIjrwffGw1IqZHKQqzIchKaadZZfnNpsAYp2mM0h36JtPCjNDAHGgYez/15uMBpfGwchhiMgg=="],
 
