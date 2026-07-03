@@ -87,7 +87,9 @@ export async function getLeaderboard(
       preliminary: !isEstablished(games),
       active: m.isActive,
       suspended,
-      suspendedAt: m.suspendedAt ? Math.floor(m.suspendedAt.getTime() / 1000) : null,
+      suspendedAt: m.suspendedAt
+        ? Math.floor(m.suspendedAt.getTime() / 1000)
+        : null,
       suspendedReason: m.suspendedReason ?? null,
     };
   });
