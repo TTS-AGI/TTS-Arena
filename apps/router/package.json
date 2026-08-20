@@ -16,6 +16,7 @@
     "@ttsa/provider-chatterbox": "workspace:*",
     "@ttsa/provider-deepdub": "workspace:*",
     "@ttsa/provider-elevenlabs": "workspace:*",
+    "@ttsa/provider-fluxions": "workspace:*",
     "@ttsa/provider-gradium": "workspace:*",
     "@ttsa/provider-hithink": "workspace:*",
     "@ttsa/provider-hume": "workspace:*",

@@ -25,6 +25,7 @@ import "@ttsa/provider-smallest";
 import "@ttsa/provider-hithink";
 import "@ttsa/provider-rumik";
 import "@ttsa/provider-luna";
+import "@ttsa/provider-fluxions";
 
 let loaded = false;
 
