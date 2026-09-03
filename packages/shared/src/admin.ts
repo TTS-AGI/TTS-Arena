@@ -79,6 +79,14 @@ export const adminModelUpdateSchema = z.object({
   url: z.string().optional(),
   icon: z.string().optional(),
   isActive: z.boolean().optional(),
+  /**
+   * Delist/relist: true hides the model from the leaderboard and from battles
+   * while keeping its row and votes intact (a provider withdrawing a model),
+   * false puts it back. Not the same as isActive, which only stops battles —
+   * an inactive model still shows on the board with its final rating.
+   */
+  hidden: z.boolean().optional(),
+  hiddenReason: z.string().optional(),
 });
 export type AdminModelUpdate = z.infer<typeof adminModelUpdateSchema>;
 

@@ -19,8 +19,9 @@ const SMOOTHING = 500;
 
 /**
  * Ids of models suppressed from battles: temporarily timed out (timedOutUntil in
- * the future) OR suspended for misconduct (suspendedAt set). Both are web-side
- * admin concepts the router doesn't know about, so we filter the catalog here.
+ * the future), suspended for misconduct (suspendedAt set), or delisted at the
+ * provider's request (hiddenAt set). All three are web-side admin concepts the
+ * router doesn't know about, so we filter the catalog here.
  */
 async function suppressedModelIds(): Promise<Set<string>> {
   const rows = await db
@@ -33,6 +34,7 @@ async function suppressedModelIds(): Promise<Set<string>> {
           gt(models.timedOutUntil, new Date()),
         ),
         isNotNull(models.suspendedAt),
+        isNotNull(models.hiddenAt),
       ),
     );
   return new Set(rows.map((r) => r.id));

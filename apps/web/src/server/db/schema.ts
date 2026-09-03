@@ -92,6 +92,17 @@ export const models = pgTable("models", {
    */
   suspendedAt: timestamp("suspended_at"),
   suspendedReason: text("suspended_reason"),
+  /**
+   * Delisting: when set, the model is hidden from the public leaderboard AND
+   * from battles — but, like a suspension and unlike a delete, its row and every
+   * vote it earned are preserved. Used when a provider withdraws a model (e.g.
+   * an unreleased preview they no longer want evaluated). Distinct from
+   * suspendedAt, which is a *penalty*: a suspended model stays on the board with
+   * a badge explaining why, because hiding misconduct would defeat the point.
+   * A withdrawal isn't misconduct, so it leaves no public trace.
+   */
+  hiddenAt: timestamp("hidden_at"),
+  hiddenReason: text("hidden_reason"),
   url: text("url"),
   /** Optional provider logo URL shown on the leaderboard. */
   icon: text("icon"),
