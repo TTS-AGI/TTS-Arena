@@ -1,6 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Dices, RotateCcw } from "lucide-react";
 import type {
@@ -47,6 +53,10 @@ export function Arena() {
   // "dataset" prompt only if the user generates with this text unchanged.
   const poolText = useRef<string | null>(null);
   const poolToken = useRef<string | null>(null);
+  // One pool prompt held in reserve so the dice button fills the box with no
+  // round-trip. /api/sentences/random is a read plus an HMAC — nothing is
+  // marked consumed until a vote lands, so holding one spare costs nothing.
+  const nextPrompt = useRef<RandomSentenceResponse | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [phase, setPhase] = useState<Phase>("compose");
   const [battle, setBattle] = useState<Battle | null>(null);
@@ -84,6 +94,25 @@ export function Arena() {
     el.style.height = `${next}px`;
     el.style.overflowY = el.scrollHeight > TEXTAREA_MAX_PX ? "auto" : "hidden";
   }, [text]);
+
+  // Refill the reserve in the background. Failures are silent: the dice button
+  // falls back to fetching inline, which is what it always did.
+  const refillPrompt = useCallback(async () => {
+    if (nextPrompt.current) return;
+    try {
+      const res = await fetch("/api/sentences/random");
+      if (!res.ok) return;
+      nextPrompt.current = (await res.json()) as RandomSentenceResponse;
+    } catch {
+      /* leave the reserve empty; randomize() will fetch on demand */
+    }
+  }, []);
+
+  // Warm the reserve once the page is idle, so the first dice click is instant.
+  useEffect(() => {
+    const id = window.setTimeout(() => void refillPrompt(), 800);
+    return () => window.clearTimeout(id);
+  }, [refillPrompt]);
 
   function markListened(side: Side, current: number) {
     if (current >= threshold.current[side]) {
@@ -138,8 +167,24 @@ export function Arena() {
     }
   }
 
+  function applyPrompt(data: RandomSentenceResponse) {
+    setText(data.sentence);
+    poolText.current = data.sentence.trim();
+    poolToken.current = data.promptToken;
+  }
+
   async function randomize() {
     if (randomizing || phase !== "compose") return;
+
+    // Reserve hit: fill the box now, refill behind the user's back.
+    const spare = nextPrompt.current;
+    if (spare) {
+      nextPrompt.current = null;
+      applyPrompt(spare);
+      void refillPrompt();
+      return;
+    }
+
     setRandomizing(true);
     try {
       const res = await fetch("/api/sentences/random");
@@ -147,10 +192,8 @@ export function Arena() {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? "couldn't fetch a random line");
       }
-      const data = (await res.json()) as RandomSentenceResponse;
-      setText(data.sentence);
-      poolText.current = data.sentence.trim();
-      poolToken.current = data.promptToken;
+      applyPrompt((await res.json()) as RandomSentenceResponse);
+      void refillPrompt();
     } catch (e) {
       toast.error(
         "Couldn't fetch a random line",
