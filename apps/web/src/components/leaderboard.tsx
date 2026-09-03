@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Checkbox } from "@base-ui-components/react/checkbox";
-import type { LeaderboardResponse, LeaderboardRow } from "@ttsa/shared";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import type { LeaderboardRow } from "@ttsa/shared";
+import { fetchLeaderboard, leaderboardKey } from "@/lib/leaderboard";
 import { ModelLogo } from "./model-logo";
 import { StealthModal } from "./stealth-modal";
 
@@ -24,31 +27,27 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 export function Leaderboard() {
   const [sort, setSort] = useState<SortKey>("elo");
-  const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
-  const [error, setError] = useState(false);
   const [stealthOpen, setStealthOpen] = useState(false);
   // When on, the board also lists newly-added models that haven't yet earned
   // enough votes to be ranked normally (badged "Preliminary").
   const [showPreliminary, setShowPreliminary] = useState(false);
+  const reduce = useReducedMotion();
 
-  useEffect(() => {
-    let active = true;
-    setRows(null);
-    setError(false);
-    const url = showPreliminary
-      ? "/api/leaderboard?type=tts&preliminary=1"
-      : "/api/leaderboard?type=tts";
-    fetch(url)
-      .then((r) => {
-        if (!r.ok) throw new Error();
-        return r.json() as Promise<LeaderboardResponse>;
-      })
-      .then((d) => active && setRows(d.rows))
-      .catch(() => active && setError(true));
-    return () => {
-      active = false;
-    };
-  }, [showPreliminary]);
+  // Both variants are warmed at app start (see AppProviders), so this is a
+  // cache read on arrival and on every toggle. keepPreviousData means the
+  // board never blanks while the other variant refreshes — the rows stay put
+  // and the new ones animate in around them.
+  const variant = { type: "tts" as const, preliminary: showPreliminary };
+  const {
+    data: rows,
+    isPending,
+    isError,
+    isFetching,
+  } = useQuery({
+    queryKey: leaderboardKey(variant),
+    queryFn: () => fetchLeaderboard(variant),
+    placeholderData: keepPreviousData,
+  });
 
   const sorted = useMemo(() => {
     if (!rows) return [];
@@ -66,6 +65,14 @@ export function Leaderboard() {
     return { min: Math.min(...elos), max: Math.max(...elos) };
   }, [rows]);
 
+  // Each vote gives one appearance to the winner and one to the loser, so the
+  // appearances across the board are twice the votes actually cast.
+  const tally = useMemo(() => {
+    if (!rows || rows.length === 0) return null;
+    const appearances = rows.reduce((sum, m) => sum + m.totalVotes, 0);
+    return { models: rows.length, votes: Math.round(appearances / 2) };
+  }, [rows]);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="text-center">
@@ -75,6 +82,19 @@ export function Leaderboard() {
         <p className="mt-2 text-ink-2">
           Ratings from blind pairwise votes. Ratings settle as the votes pile
           up; newer models join once they’ve earned enough.
+        </p>
+        {/* Scale of the thing, in the mono micro-label. The dot pulses while a
+            refresh is in flight — the only "loading" cue once rows are up. */}
+        <p className="tag mt-3 flex items-center justify-center gap-2">
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 rounded-full bg-accent transition-opacity ${
+              isFetching ? "animate-pulse opacity-100" : "opacity-25"
+            }`}
+          />
+          {tally
+            ? `${tally.models} models · ${fmtVotes(tally.votes)} votes cast`
+            : " "}
         </p>
       </div>
 
@@ -87,13 +107,22 @@ export function Leaderboard() {
               <button
                 key={s.key}
                 onClick={() => setSort(s.key)}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                  on
-                    ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
-                    : "text-ink-3 hover:text-ink-2"
-                }`}
+                className="relative rounded-full px-3.5 py-1.5 text-sm font-medium"
               >
-                {s.label}
+                {on && (
+                  <motion.span
+                    layoutId="sort-pill"
+                    transition={{ type: "spring", stiffness: 460, damping: 38 }}
+                    className="absolute inset-0 rounded-full bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                  />
+                )}
+                <span
+                  className={`relative transition-colors ${
+                    on ? "text-ink" : "text-ink-3 hover:text-ink-2"
+                  }`}
+                >
+                  {s.label}
+                </span>
               </button>
             );
           })}
@@ -124,32 +153,63 @@ export function Leaderboard() {
         </label>
       </div>
 
-      {error ? (
+      {isError ? (
         <p className="text-center text-sm text-ink-3">
           Couldn’t load the leaderboard.
         </p>
-      ) : rows === null ? (
-        <p className="text-center text-sm text-ink-3">Loading…</p>
-      ) : rows.length === 0 ? (
+      ) : isPending ? (
+        <BoardSkeleton />
+      ) : sorted.length === 0 ? (
         <p className="text-center text-sm text-ink-3">
           No votes yet — be the first in the arena.
         </p>
       ) : (
         <div className="card divide-y divide-line overflow-hidden">
-          {sorted.map((m, i) => (
-            <Row
-              key={m.id}
-              model={m}
-              displayRank={m.suspended ? null : i + 1}
-              sort={sort}
-              eloRange={eloRange}
-              onStealthClick={() => setStealthOpen(true)}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {sorted.map((m, i) => (
+              <Row
+                key={m.id}
+                model={m}
+                displayRank={m.suspended ? null : i + 1}
+                sort={sort}
+                eloRange={eloRange}
+                animate={!reduce}
+                onStealthClick={() => setStealthOpen(true)}
+              />
+            ))}
+          </AnimatePresence>
         </div>
       )}
 
       <StealthModal open={stealthOpen} onClose={() => setStealthOpen(false)} />
+    </div>
+  );
+}
+
+/**
+ * Placeholder board. Matches the real row geometry exactly, so the switch to
+ * live rows is a fill rather than a jump — no reflow, no scroll shift.
+ */
+function BoardSkeleton() {
+  return (
+    <div className="card divide-y divide-line overflow-hidden" aria-hidden>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+          <span className="shimmer h-3 w-6 shrink-0 rounded" />
+          <span className="shimmer h-8 w-8 shrink-0 rounded-lg" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span
+              className="shimmer h-3.5 rounded"
+              style={{ width: `${38 + ((i * 13) % 34)}%` }}
+            />
+            <span className="shimmer h-2.5 w-14 rounded" />
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="shimmer h-4 w-10 rounded" />
+            <span className="shimmer h-2.5 w-8 rounded" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -159,12 +219,14 @@ function Row({
   displayRank,
   sort,
   eloRange,
+  animate,
   onStealthClick,
 }: {
   model: LeaderboardRow;
   displayRank: number | null;
   sort: SortKey;
   eloRange: { min: number; max: number };
+  animate: boolean;
   onStealthClick: () => void;
 }) {
   const eloFrac =
@@ -184,23 +246,36 @@ function Row({
     : "";
 
   return (
-    <div
-      className={`relative flex items-center gap-3 px-4 py-3.5 ${model.suspended ? "opacity-55" : ""}`}
+    <motion.div
+      // Position-only layout animation: rows glide to their new place when the
+      // sort changes instead of teleporting, and it stays cheap because nothing
+      // interpolates size.
+      layout={animate ? "position" : false}
+      transition={{ type: "spring", stiffness: 520, damping: 42 }}
+      initial={animate ? { opacity: 0 } : false}
+      animate={{ opacity: model.suspended ? 0.55 : 1 }}
+      exit={{ opacity: 0 }}
+      className="relative flex items-center gap-3 px-4 py-3.5"
     >
       {!model.suspended && (
-        <span
-          className="pointer-events-none absolute inset-y-1 left-1 rounded-[0.6rem] bg-accent-soft opacity-60"
+        <motion.span
+          className="pointer-events-none absolute inset-y-1 left-1 origin-left rounded-[0.6rem] bg-accent-soft opacity-60"
           style={{ width: `calc((100% - 0.5rem) * ${0.12 + eloFrac * 0.88})` }}
+          initial={animate ? { scaleX: 0 } : false}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         />
       )}
+      {/* Rank in mono, zero-padded — reads as a chart position rather than a
+          number that happens to sit in a list. */}
       <span
-        className={`nums relative w-6 text-center text-sm font-semibold ${
+        className={`relative w-6 text-center font-mono text-xs tabular-nums ${
           displayRank !== null && displayRank <= 3
-            ? "text-accent"
+            ? "font-semibold text-accent"
             : "text-ink-4"
         }`}
       >
-        {displayRank ?? "—"}
+        {displayRank === null ? "—" : String(displayRank).padStart(2, "0")}
       </span>
 
       <div className="relative flex min-w-0 flex-1 items-center gap-2.5">
@@ -274,6 +349,6 @@ function Row({
         </p>
         <p className="tag mt-0.5">{valueLabel}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

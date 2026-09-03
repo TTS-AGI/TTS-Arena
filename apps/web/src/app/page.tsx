@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Segmented, type ViewId } from "@/components/segmented";
 import { SystemTheme } from "@/components/system-theme";
+import { AppProviders } from "@/components/providers";
 import { AuthProvider } from "@/components/auth";
 import { ToastProvider } from "@/components/toast";
 import { Account } from "@/components/account";
@@ -41,56 +42,58 @@ export default function Home() {
   }, []);
 
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <SystemTheme />
-        <div className="min-h-dvh overflow-x-hidden">
-          <DiscordBanner />
-          {/* Top bar */}
-          <header className="sticky top-0 z-40 bg-canvas/75 backdrop-blur-xl">
-            <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
-              <button
-                onClick={() => go("arena")}
-                className="text-[0.95rem] font-semibold tracking-tight"
-              >
-                TTS&nbsp;Arena
-              </button>
-              <div className="flex items-center gap-3">
-                <a
-                  href="https://docs.ttsarena.org/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-medium text-ink-3 transition-colors hover:text-ink"
+    <AppProviders>
+      <ToastProvider>
+        <AuthProvider>
+          <SystemTheme />
+          <div className="min-h-dvh overflow-x-hidden">
+            <DiscordBanner />
+            {/* Top bar */}
+            <header className="sticky top-0 z-40 bg-canvas/75 backdrop-blur-xl">
+              <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
+                <button
+                  onClick={() => go("arena")}
+                  className="text-[0.95rem] font-semibold tracking-tight"
                 >
-                  Docs
-                </a>
-                <Account />
+                  TTS&nbsp;Arena
+                </button>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://docs.ttsarena.org/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-ink-3 transition-colors hover:text-ink"
+                  >
+                    Docs
+                  </a>
+                  <Account />
+                </div>
               </div>
+            </header>
+
+            {/* Sub-nav */}
+            <div className="mx-auto flex max-w-3xl justify-center px-5 pt-2 pb-2">
+              <Segmented active={view} onChange={go} />
             </div>
-          </header>
 
-          {/* Sub-nav */}
-          <div className="mx-auto flex max-w-3xl justify-center px-5 pt-2 pb-2">
-            <Segmented active={view} onChange={go} />
+            {/* View — instant state swap (URL synced separately) with a quick fade */}
+            <main className="mx-auto max-w-3xl px-5 pt-8 pb-28">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={view}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0, transition: SNAP }}
+                  exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
+                >
+                  {view === "arena" && <Arena />}
+                  {view === "leaderboard" && <Leaderboard />}
+                  {view === "about" && <About />}
+                </motion.div>
+              </AnimatePresence>
+            </main>
           </div>
-
-          {/* View — instant state swap (URL synced separately) with a quick fade */}
-          <main className="mx-auto max-w-3xl px-5 pt-8 pb-28">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={view}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0, transition: SNAP }}
-                exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
-              >
-                {view === "arena" && <Arena />}
-                {view === "leaderboard" && <Leaderboard />}
-                {view === "about" && <About />}
-              </motion.div>
-            </AnimatePresence>
-          </main>
-        </div>
-      </AuthProvider>
-    </ToastProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </AppProviders>
   );
 }

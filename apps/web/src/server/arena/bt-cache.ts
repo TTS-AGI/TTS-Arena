@@ -6,7 +6,7 @@
  * recompute only when at least RECOMPUTE_DELTA new counting votes have landed
  * since the last fit (or on the first request).
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { bradleyTerry, type BTRating, type ModelType } from "@ttsa/shared";
 import { db } from "../db/client";
 import { models, users, votes } from "../db/schema";
@@ -23,8 +23,12 @@ export function invalidateBTCache(): void {
 }
 
 async function countingVotes(type: ModelType): Promise<number> {
+  // count(*) in the database, not rows.length in Node: this runs on EVERY
+  // leaderboard request (it's the cache key), and selecting every counting vote
+  // just to measure the array meant the board's cost grew with total votes even
+  // on a cache hit.
   const rows = await db
-    .select({ c: votes.id })
+    .select({ c: sql<number>`count(*)` })
     .from(votes)
     .innerJoin(users, eq(votes.userId, users.id))
     .where(
@@ -35,7 +39,7 @@ async function countingVotes(type: ModelType): Promise<number> {
         eq(users.quarantined, false),
       ),
     );
-  return rows.length;
+  return Number(rows[0]?.c ?? 0);
 }
 
 /**
