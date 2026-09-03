@@ -47,11 +47,13 @@ export async function getLeaderboard(
     const games = publicGames(m.id);
     return includePreliminary ? games > 0 : isRanked(games);
   };
-  // Delisted models leave the board completely — no row, no badge, no rank.
-  // Their votes stay in the DB (and still feed the BT fit's pairwise history),
-  // they just aren't published. Contrast with suspended, handled below.
-  const listed = (m: (typeof typeModels)[number]) => m.hiddenAt == null;
-  const rows = typeModels.filter(listed).filter(floor).map((m) => {
+  // Delisted models (hiddenAt set) leave the board completely — no row, no
+  // badge, no rank. Their votes stay in the DB and still feed the BT fit's
+  // pairwise history, they just aren't published. Contrast with suspended,
+  // handled below, which stays visible on purpose.
+  const shown = (m: (typeof typeModels)[number]) =>
+    m.hiddenAt == null && floor(m);
+  const rows = typeModels.filter(shown).map((m) => {
     const btr = bt.get(m.id);
     const games = btr?.games ?? 0;
     const wins = btr?.wins ?? 0;
