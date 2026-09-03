@@ -170,6 +170,16 @@ export const votes = pgTable(
 
     /** Seconds between generation and vote (engagement signal). */
     sessionDurationSeconds: doublePrecision("session_duration_seconds"),
+
+    /**
+     * Client identity at the moment of the vote. user_logins already records
+     * where a session *started*, but that's where the attacker chose to sign
+     * in — once, from somewhere clean — not where the votes came from. The
+     * cluster sweep needs the latter, so it's recorded per vote.
+     */
+    ip: text("ip"),
+    fingerprint: text("fingerprint"),
+
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
@@ -181,6 +191,12 @@ export const votes = pgTable(
     // Velocity checks: votes by a user over a recent window.
     byUserTime: index("votes_user_time_idx").on(t.userId, t.createdAt),
     byFlagged: index("votes_flagged_idx").on(t.flagged),
+    // Cluster sweep: recent votes grouped by the identity that cast them.
+    byIpTime: index("votes_ip_time_idx").on(t.ip, t.createdAt),
+    byFingerprintTime: index("votes_fingerprint_time_idx").on(
+      t.fingerprint,
+      t.createdAt,
+    ),
   }),
 );
 

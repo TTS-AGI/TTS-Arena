@@ -33,11 +33,21 @@ Votes run through an anti-abuse system so the board reflects real preferences:
 - **Behavioral signals** score each vote for risk (timing, patterns, device and
   network signals). High-risk votes are recorded but **shadow-excluded** - they
   never move the public ratings.
-- A lightweight **proof-of-work captcha** appears once per session, and again if
-  risk rises.
-- A background sweep looks for coordinated rings (many accounts sharing an IP or
-  fingerprint piling onto one model) and per-account bias, retroactively
-  excluding suspicious votes and recomputing the board from the clean set.
+- A **captcha** appears once per browser, and again if risk rises.
+- A background sweep looks for coordinated rings - accounts sharing an IP or
+  device that pile onto one model, whether they signed in together or merely
+  voted together - and retroactively excludes their votes.
+- The sweep also runs a **statistical test for recognition**. For every voter
+  and every model, it compares how often that voter picks the model against how
+  often everyone else does, counting only the battles the model actually
+  appeared in. Liking a model puts you a few points above the crowd. Picking it
+  almost every time it appears, when the crowd is split, is not a preference -
+  it means you can tell which one it is, and a blind test where you can't be
+  blind isn't a vote. The comparison excludes the voter's own votes from the
+  baseline, so nobody can define the norm they are measured against.
+
+Whenever votes are excluded, the leaderboard is recomputed from the clean set,
+so a rating never keeps the lift it was given.
 
 <Callout>
   None of this affects honest voting - it's invisible unless your activity looks

@@ -6,6 +6,7 @@ export * from "./models";
 export * from "./elo";
 export * from "./glicko";
 export * from "./bradley-terry";
+export * from "./binomial";
 export * from "./api";
 export * from "./router";
 export * from "./admin";

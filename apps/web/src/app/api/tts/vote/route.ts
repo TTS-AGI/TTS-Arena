@@ -6,23 +6,19 @@
  * session (re-votes are rejected).
  */
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { inArray } from "drizzle-orm";
 import { voteRequestSchema, type VoteResponse } from "@ttsa/shared";
 import { currentUser } from "@/server/auth/user";
-import { cookieSecurity } from "@/server/auth/session";
 import { getSession, deleteSession } from "@/server/arena/session-store";
 import { recordVote } from "@/server/arena/vote";
 import { assessVote, SECURITY } from "@/server/arena/security";
 import { latestFingerprint } from "@/server/auth/logins";
+import { clientIp } from "@/server/request-info";
 import { verifyHcaptcha } from "@/server/security/hcaptcha";
+import { grantClearance, hasClearance } from "@/server/security/clearance";
 import { errInfo, logErrorEvent } from "@/server/observability/errors";
 import { db } from "@/server/db/client";
 import { models } from "@/server/db/schema";
-
-/** Cookie marking "captcha solved this session" + its lifetime. */
-const CAP_COOKIE = "ttsa_cap";
-const CAP_TTL_SECONDS = 60 * 60 * 6; // 6h
 
 export async function POST(req: Request) {
   const user = await currentUser();
@@ -52,30 +48,21 @@ export async function POST(req: Request) {
     );
   }
 
-  // Captcha gate: solve once per browser session, then risk-triggered. We track
-  // "solved this session" with a short-lived signed-ish cookie set when a valid
-  // Cap token is presented. If a captcha is required but none/invalid is
-  // supplied, ask the client to solve one and retry — not a hard error (no
-  // tip-off, low friction).
-  const cookieStore = await cookies();
-  const capToken = req.headers.get("x-cap-token");
-  const captchaOk = await verifyHcaptcha(capToken);
-  const alreadySolvedThisSession = cookieStore.get(CAP_COOKIE)?.value === "1";
-
+  // Captcha gate: solve once per browser, then ride the signed clearance for
+  // its lifetime. If a solve is needed and none arrives, ask the client to do
+  // one and retry — not a hard error (no tip-off, low friction).
+  //
+  // Clearance is checked BEFORE the token is verified, so a browser that keeps
+  // resending its now-spent token doesn't cost a siteverify round trip on every
+  // vote. hCaptcha tokens are single-use; only the first one ever validates.
+  const cleared = SECURITY.disabled() || (await hasClearance(user.id));
   let captchaRequired = false;
-  if (!SECURITY.disabled() && !captchaOk && !alreadySolvedThisSession) {
+  if (!cleared) {
     captchaRequired = true;
-    return NextResponse.json({ needsCaptcha: true });
-  }
-  // A freshly validated token marks the session as captcha-cleared.
-  if (captchaOk && !alreadySolvedThisSession) {
-    cookieStore.set(CAP_COOKIE, "1", {
-      httpOnly: true,
-      sameSite: cookieSecurity().sameSite,
-      secure: cookieSecurity().secure,
-      path: "/",
-      maxAge: CAP_TTL_SECONDS,
-    });
+    if (!(await verifyHcaptcha(req.headers.get("x-cap-token")))) {
+      return NextResponse.json({ needsCaptcha: true });
+    }
+    await grantClearance(user.id);
   }
 
   try {
@@ -87,12 +74,18 @@ export async function POST(req: Request) {
       durationSeconds,
       fingerprint,
       captchaRequired,
-      captchaOk,
+      // We never get here on a failed solve — the request returns above — so
+      // this is always true. Passed through anyway so assessVote keeps a
+      // truthful view of the request rather than an assumed one.
+      captchaOk: true,
     });
 
     // recordVote marks the session voted + applies ratings (only if the
     // assessment says the vote counts) in one transaction.
-    const result = await recordVote(session, chosen, assessment);
+    const result = await recordVote(session, chosen, assessment, {
+      ip: clientIp(req),
+      fingerprint,
+    });
 
     // Reveal display metadata from the DB (current name/url/open for each id)
     // BEFORE deleting the session, so a delete failure can't lose the result.

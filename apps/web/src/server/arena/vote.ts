@@ -33,10 +33,14 @@ function glickoOf(m: ModelRow): Glicko {
   return { rating: m.rating, rd: m.ratingDeviation, vol: m.volatility };
 }
 
+/** Where the vote was cast from, for the cluster sweep. Both may be null. */
+export type VoteClient = { ip: string | null; fingerprint: string | null };
+
 export async function recordVote(
   session: BattleSession,
   chosenKey: "a" | "b",
   assessment?: Assessment,
+  client?: VoteClient,
 ): Promise<VoteResult> {
   const chosenSide = session[chosenKey];
   const rejectedSide = session[chosenKey === "a" ? "b" : "a"];
@@ -104,6 +108,8 @@ export async function recordVote(
         riskReasons,
         flagged,
         sessionDurationSeconds: (Date.now() - session.createdAt) / 1000,
+        ip: client?.ip ?? null,
+        fingerprint: client?.fingerprint ?? null,
       })
       .returning({ id: votes.id });
     const voteId = vote!.id;
