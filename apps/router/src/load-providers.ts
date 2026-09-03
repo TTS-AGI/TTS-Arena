@@ -19,6 +19,7 @@ import "@ttsa/provider-chatterbox";
 import "@ttsa/provider-inworld";
 import "@ttsa/provider-mars";
 import "@ttsa/provider-tontaube";
+import "@ttsa/provider-unisound";
 import "@ttsa/provider-voiceai";
 import "@ttsa/provider-deepdub";
 import "@ttsa/provider-smallest";
