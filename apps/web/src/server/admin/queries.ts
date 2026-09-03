@@ -334,13 +334,32 @@ export async function clearAllModelTimeouts(): Promise<number> {
 
 export async function updateModel(
   id: string,
-  patch: { name?: string; url?: string; icon?: string; isActive?: boolean },
+  patch: {
+    name?: string;
+    url?: string;
+    icon?: string;
+    isActive?: boolean;
+    hidden?: boolean;
+    hiddenReason?: string;
+  },
 ): Promise<boolean> {
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.url !== undefined) set.url = patch.url || null;
   if (patch.icon !== undefined) set.icon = patch.icon || null;
   if (patch.isActive !== undefined) set.isActive = patch.isActive;
+  if (patch.hidden !== undefined) {
+    // coalesce keeps the ORIGINAL delisting timestamp if the model is already
+    // hidden, so re-sending the patch (or editing the reason) doesn't rewrite
+    // when it happened.
+    set.hiddenAt = patch.hidden
+      ? sql`coalesce(${models.hiddenAt}, now())`
+      : null;
+    if (!patch.hidden) set.hiddenReason = null;
+  }
+  if (patch.hiddenReason !== undefined) {
+    set.hiddenReason = patch.hiddenReason || null;
+  }
 
   const updated = await withWriteRetry(() =>
     db.update(models).set(set).where(eq(models.id, id)).returning({

@@ -22,6 +22,13 @@
       "when": 1783097316584,
       "tag": "0002_useful_the_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788402700062,
+      "tag": "0003_worthless_thunderbolts",
+      "breakpoints": true
     }
   ]
 }
