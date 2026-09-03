@@ -29,6 +29,7 @@
     "@ttsa/provider-smallest": "workspace:*",
     "@ttsa/provider-tontaube": "workspace:*",
     "@ttsa/provider-typecast": "workspace:*",
+    "@ttsa/provider-unisound": "workspace:*",
     "@ttsa/provider-voiceai": "workspace:*",
     "@ttsa/shared": "workspace:*",
     "hono": "^4.6.14"
