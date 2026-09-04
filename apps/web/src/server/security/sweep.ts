@@ -158,7 +158,7 @@ async function flagLopsidedCohort(params: {
     await withWriteRetry(() =>
       db
         .update(users)
-        .set({ trustScore: sql`max(0, ${users.trustScore} - 30)` })
+        .set({ trustScore: sql`greatest(0, ${users.trustScore} - 30)` })
         .where(inArray(users.id, accountIds)),
     );
   }
@@ -336,7 +336,7 @@ async function sweepBias(sinceMs: number): Promise<number> {
       await withWriteRetry(() =>
         db
           .update(users)
-          .set({ trustScore: sql`max(0, ${users.trustScore} - 40)` })
+          .set({ trustScore: sql`greatest(0, ${users.trustScore} - 40)` })
           .where(eq(users.id, u.userId)),
       );
       await logSecurityEvent({
@@ -536,7 +536,7 @@ async function sweepPreference(): Promise<number> {
       db
         .update(users)
         .set({
-          trustScore: sql`max(0, ${users.trustScore} - ${P.trustPenalty})`,
+          trustScore: sql`greatest(0, ${users.trustScore} - ${P.trustPenalty})`,
         })
         .where(eq(users.id, s.userId)),
     );
