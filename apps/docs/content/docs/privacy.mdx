@@ -1,0 +1,83 @@
+---
+title: Privacy
+description: What TTS Arena collects, why, and what we do with it.
+---
+
+TTS Arena is a volunteer-run, open-source research project. We collect what we
+need to keep the votes honest and to build a useful benchmark, and not much
+else. This page says what that is in plain terms.
+
+## What we collect
+
+**When you sign in** with Hugging Face, we receive your Hugging Face user ID,
+username, avatar, account creation date, and the email address on the account.
+The account age is used for the 30-day voting requirement. The email is stored
+so we can contact you about your account (for example, if it's been
+quarantined) and is not used for anything else.
+
+**When you use the arena**, we record:
+
+- the prompts you submit and the audio each model produced for them;
+- your votes, and how long you listened before voting;
+- your IP address, browser user-agent, and a device fingerprint, on sign-in and
+  with each vote;
+- session events - battles started, whether they were voted on or abandoned,
+  generation timings and errors.
+
+A **captcha** may run once per browser. It stores a short-lived token and
+nothing about you.
+
+## Why
+
+Almost all of this exists for one reason: a blind preference benchmark is only
+worth something if the votes are real. IP, fingerprint, timing, and session
+data are what let us spot automated voting, coordinated rings, and accounts
+that can somehow recognise a model they shouldn't be able to. The
+[voting](/voting) page describes how that system works.
+
+The prompts and audio are the benchmark itself. They're what we and others can
+use to study how people judge synthetic speech.
+
+## What we publish
+
+- The leaderboard: per-model ratings, uncertainty, win rates, and vote counts.
+  Never per-voter data.
+- Aggregate statistics and, from time to time, anonymised datasets of prompts,
+  audio, and preferences. These contain no account identifiers, IP addresses,
+  fingerprints, or email addresses.
+- Accounts of integrity findings against model providers. These name the model
+  and the provider, and can quote what the provider told us. They can describe
+  the behaviour of accounts involved. See the
+  [Provider Agreement](/provider-agreement).
+
+## What we don't do
+
+- We don't sell data, run ads, or share personal data with model providers.
+  Providers see their model's ratings, not who voted.
+- We don't send your identity to the model endpoints. They receive the prompt
+  text, nothing else.
+- We don't track you across other sites.
+
+## Retention
+
+We keep vote, session, and anti-abuse records indefinitely, because a decision
+about the leaderboard has to remain checkable after the fact. Cached audio is
+kept as long as it's useful to the benchmark.
+
+If you want your account data removed, contact us. We'll delete your profile
+information (username, email, avatar). Vote records may be retained in
+anonymised form so the leaderboard's history remains consistent.
+
+## Where it lives
+
+The app runs on Hugging Face Spaces; the database runs on a server we operate.
+Hugging Face handles the sign-in and has its own
+[privacy policy](https://huggingface.co/privacy). TTS Arena is not affiliated
+with Hugging Face.
+
+## Contact
+
+Questions or deletion requests: [Discord](https://discord.gg/HB8fMR6GTr) or
+[email](mailto:me@mrfake.name).
+
+_Last updated 5 September 2026._
