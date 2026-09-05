@@ -51,7 +51,10 @@ export async function getBTRatings(
 ): Promise<Map<string, BTRating>> {
   const total = await countingVotes(type);
   const cached = cache.get(type);
-  if (cached && total - cached.voteCount < RECOMPUTE_DELTA) {
+  // Absolute delta: the counting set shrinks too (a quarantine drops every
+  // vote from the affected accounts), and a stale fit after that would keep
+  // publishing the very ratings the quarantine was meant to correct.
+  if (cached && Math.abs(total - cached.voteCount) < RECOMPUTE_DELTA) {
     return cached.ratings;
   }
 
