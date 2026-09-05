@@ -1,0 +1,218 @@
+---
+title: Provider Agreement
+description: The terms under which a model is listed and evaluated on TTS Arena.
+---
+
+_Effective 5 September 2026._
+
+This agreement is between the **TTS Arena** project ("TTS Arena", "we", "us")
+and any person or organisation that submits a text-to-speech model for
+evaluation (the "Provider", "you"). By submitting a model, or by leaving a model
+listed after this agreement is posted, you accept it on behalf of yourself and
+the organisation you represent.
+
+It is written in plain English on purpose. Where it says "must", it means it.
+
+## 1. Who we are
+
+TTS Arena is an independent, open-source community project maintained by
+volunteers. **It is not affiliated with, operated by, sponsored by, or endorsed
+by Hugging Face, Inc.**, or by any model provider. The arena is hosted on
+Hugging Face Spaces and uses Hugging Face accounts for sign-in, in the same way
+any third-party project may; that does not make it a Hugging Face product, and
+nothing in the arena's rankings, labels, or communications is a statement by
+Hugging Face. The source is public under the Apache 2.0 licence.
+
+## 2. Submitting a model
+
+1. **Accurate information.** Everything you tell us about the model - its name,
+   provider, whether it is publicly available, which model is actually behind
+   the endpoint - must be true, and you must tell us when it changes.
+2. **Identity.** You must tell us who you are: the organisation, and a contact
+   who can speak for it. This applies to codenamed entries too (see section 5).
+3. **Authority.** The person submitting confirms they are authorised to bind the
+   Provider to this agreement.
+4. **One model, one entry.** We evaluate one version of a model at a time. A new
+   version is a new submission, and we may decline to run two entries from the
+   same provider that are substantially the same model.
+5. **Our discretion.** We may accept, decline, delay, or remove any submission,
+   for any reason, including capacity, cost, and the integrity of the board.
+
+## 3. The endpoint
+
+1. **It serves the model you said it does**, and the same model that users of
+   your product get. No arena-specific tuning, no better model for arena
+   traffic, no silent swaps. If you change what is behind the endpoint, tell us
+   first; we will decide whether the entry continues or restarts.
+2. **Prompt handling.** The endpoint must synthesise what it is given. It must
+   not detect arena prompts, treat arena traffic differently from ordinary
+   traffic, or cache and replay outputs for known prompts. If it refuses a
+   prompt (for example on safety grounds), it must return an error, not degraded
+   audio.
+3. **Voices.** You supply a fixed pool of voices for us to rotate through. We do
+   not do zero-shot cloning in the arena.
+4. **Availability.** The endpoint should be reliably available. We may time out,
+   retire, or remove a model whose endpoint is failing, slow enough to distort
+   the listening test, or rate-limiting the arena below what evaluation needs.
+5. **Cost.** You bear the cost of serving your own endpoint, and you must not
+   charge the arena for it. We may cap the volume of requests we send.
+6. **Keys.** We keep your API credentials confidential, use them only for the
+   arena, and delete them when the model is retired. You may rotate them at any
+   time by telling us.
+
+## 4. Integrity
+
+The [integrity policy](/integrity) is part of this agreement. In full:
+
+1. **No voting on your own model** by anyone on your side: employees,
+   contractors, interns, agencies, investors, family, communities you run, or
+   anyone acting at your request or with your encouragement. This includes
+   personal accounts and any "test" or shared accounts. You must not create,
+   lend, or control voter accounts.
+2. **No un-blinding.** You must not use your endpoint's request logs,
+   timestamps, telemetry, watermarks, audio artefacts, prompt matching, or any
+   other side channel to work out which side of a battle is yours, whether or
+   not you then vote. The arena is a blind test; defeating the blind for
+   yourself defeats the test.
+3. **No purchased, incentivised, automated, or coordinated votes.** No paying
+   or rewarding people for votes, no bots or scripts, no vote drives, no asking
+   a community to "go vote for us".
+4. **No selective participation.** You must not use the arena as an internal
+   evaluation harness - for example, generating battles and abandoning the ones
+   your model isn't in. Compare models with your own tooling, or with custom
+   prompts here, which do not affect the ratings.
+5. **No harvesting.** You must not scrape the arena, or use it to collect other
+   providers' audio, prompts, or outputs for training, benchmarking, or
+   reverse-engineering.
+6. **Disclosure.** If you become aware that anyone connected to you has done any
+   of the above, you must tell us promptly.
+7. **Cooperation.** If we contact you about activity that looks like a breach,
+   you must respond honestly and within a reasonable time. Silence, or answers
+   that later prove false, are themselves a breach.
+
+## 5. Codenamed (anonymous) entries
+
+1. You may run an unreleased model under a codename. It is anonymous **to
+   voters**, not to us: we must know the provider and the model.
+2. Anonymity is bounded by time or vote count, set when the entry is accepted,
+   and ends regardless of how the model performs. You may withdraw before then;
+   you may not reveal only because it won, or keep an entry codenamed
+   indefinitely.
+3. A model that is already publicly available runs under its real name.
+4. We keep your identity confidential until the reveal **as a courtesy, not a
+   guarantee**. If this agreement is breached we may disclose the provider as
+   part of the outcome. We may also disclose it if required by law.
+
+## 6. Data, audio, and publication
+
+1. **Generated audio.** Audio your endpoint produces for the arena may be
+   stored, played to voters, cached, and published, including as part of
+   research datasets and in illustrations of results. You grant TTS Arena a
+   perpetual, worldwide, royalty-free licence to do so, and you confirm you have
+   the rights needed to grant it.
+2. **Votes and sessions.** Vote records, session data, and anti-abuse signals
+   belong to the arena. We may publish aggregate results and anonymised data.
+   Providers do not receive raw voter data.
+3. **Correspondence.** Communications between you and the arena about a listing,
+   an integrity review, or a decision may be quoted or published, in whole or
+   in part, as part of our account of that matter.
+4. **Outcomes.** We may publish the outcome of any integrity review, including
+   the model name, the provider name, what the data showed, and what the
+   provider told us. By submitting, you consent to that publication.
+5. **Nothing is deleted.** Votes, sessions, and correspondence are retained so
+   that any decision can be checked afterwards.
+
+## 7. Using arena results
+
+1. You may cite your model's ranking, rating, or win rate, provided you state
+   the date and link to the leaderboard. Rankings move; a claim must be true
+   when it is made and must not be presented as permanent.
+2. You must not alter, crop, or restyle leaderboard screenshots in a way that
+   changes their meaning, omit the Preliminary or Suspended labels, or present
+   results of custom prompts, side-by-side listening, or your own testing as
+   arena results.
+3. You must not describe TTS Arena results as an official ranking by Hugging
+   Face or anyone else, or imply that TTS Arena endorses your model.
+4. You may use the TTS Arena name to refer to the arena factually. You may not
+   use it, or the arena's marks, in a way that suggests partnership or
+   endorsement.
+
+## 8. Labels, withdrawal, and removal
+
+1. **Preliminary** marks a model with fewer votes than we need to settle its
+   rating. It is ranked normally.
+2. **Retired** marks a model whose provider has stopped serving it. You may
+   retire a model at any time by telling us. It stays on the board with the
+   rating it earned.
+3. **Suspended** marks a model removed from evaluation for a breach of this
+   agreement. It stays on the leaderboard, at the bottom, unranked, with the
+   reason and date. The label has no expiry. A suspended model **cannot be
+   retracted, withdrawn, renamed, or re-submitted under another name**, and
+   retiring it does not remove the label.
+4. We may remove or retire a model for technical reasons (a failing endpoint, a
+   discontinued API) without that being a finding against the provider, and we
+   will say so.
+
+## 9. Consequences of breach
+
+If we find that this agreement has been breached:
+
+1. affected votes are excluded and the leaderboard is recomputed from the clean
+   set;
+2. the model is suspended as described in section 8;
+3. we may publish an account of what happened as described in section 6;
+4. we may decline future submissions from the same provider, or accept them on
+   conditions;
+5. we may inform other evaluation platforms of the outcome.
+
+Whether the breach was intended is not the test. Conduct that moves the board
+is a breach whether or not that was the purpose.
+
+Findings are made by the TTS Arena team on the evidence available to us. We
+will contact the provider before a decision where we reasonably can, and we
+will consider what the provider says. Decisions are final.
+
+## 10. Disclaimers
+
+1. The arena, its ratings, and its API are provided **"as is"**, without
+   warranty of any kind. Ratings are statistical estimates from crowd
+   preferences; they are not a measure of fitness for any purpose.
+2. We do not guarantee that a model will be listed, evaluated to any number of
+   votes, evaluated within any time, or kept on the board.
+3. We do not guarantee uptime, and we may change the arena's methodology,
+   thresholds, design, or rules at any time. Material changes to this agreement
+   will be posted here with a new effective date; keeping a model listed after
+   that is acceptance.
+
+## 11. Liability and indemnity
+
+1. To the fullest extent permitted by law, TTS Arena and its maintainers are
+   not liable to you for any indirect, incidental, consequential, or special
+   damages, or for lost profits, revenue, or business, arising from the arena,
+   a listing, a rating, a label, or a published outcome. Where liability cannot
+   be excluded, it is limited to US $100.
+2. You will indemnify TTS Arena and its maintainers against claims arising from
+   your endpoint, your audio, your use of arena results, or your breach of this
+   agreement.
+
+## 12. General
+
+1. **Governing law.** This agreement is governed by the laws of the State of
+   California, USA, without regard to conflict-of-law rules. Disputes will be
+   brought in the state or federal courts located in California, and you
+   consent to their jurisdiction. Before bringing any claim, you agree to raise
+   the matter with us in writing and allow thirty days for an informal
+   resolution.
+2. **Relationship.** Nothing here creates a partnership, agency, employment, or
+   joint venture. Listing a model is not an endorsement of the provider by the
+   arena, or of the arena by the provider.
+3. **Assignment.** You may not transfer this agreement without our written
+   consent. We may assign it to a successor maintainer of the project.
+4. **Severability.** If any part is unenforceable, the rest stands.
+5. **Entire agreement.** This page, the [integrity policy](/integrity), and the
+   [Provider API](/api) documentation are the whole agreement between you and
+   TTS Arena about a listing. Anything said in Discord, email, or on a call
+   does not change it unless we confirm the change in writing.
+6. **Contact.** The TTS Arena team can be reached on
+   [Discord](https://discord.gg/HB8fMR6GTr) or by
+   [email](mailto:me@mrfake.name).
