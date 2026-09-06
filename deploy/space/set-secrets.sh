@@ -123,10 +123,13 @@ echo "[set-secrets] syncing secrets to ${REPO}"
 # Secrets arrive as one JSON blob in $ALL_SECRETS (GitHub's toJSON(secrets)).
 # Keys are read with python; values are passed via env to set_secret so they're
 # never interpolated into the command line.
-# Note: PRIVATE_PROVIDERS_TOKEN IS synced — the Space's Docker build mounts it
-# as a build secret (RUN --mount=type=secret,id=PRIVATE_PROVIDERS_TOKEN) to
-# clone the private providers. HF_TOKEN/github_token stay out (deploy infra).
-EXCLUDE_RE='^(github_token|HF_TOKEN|PRIVATE_PROVIDERS_REPO|SYNC_SECRETS_FORCE)$'
+# Note: PRIVATE_PROVIDERS_TOKEN and ANTIFRAUD_TOKEN ARE synced — the Space's
+# Docker build mounts each as a build secret
+# (RUN --mount=type=secret,id=PRIVATE_PROVIDERS_TOKEN / id=ANTIFRAUD_TOKEN) to
+# clone the private providers and the private anti-fraud impl respectively.
+# The *_REPO names live in the Dockerfile (not secrets), and
+# HF_TOKEN/github_token stay out (deploy infra).
+EXCLUDE_RE='^(github_token|HF_TOKEN|PRIVATE_PROVIDERS_REPO|ANTIFRAUD_REPO|SYNC_SECRETS_FORCE)$'
 
 if [ -z "${ALL_SECRETS:-}" ]; then
   echo "[set-secrets] ALL_SECRETS is empty; nothing to sync" >&2
