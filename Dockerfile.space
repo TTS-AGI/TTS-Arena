@@ -65,8 +65,45 @@ RUN bun install
 
 # ── build the web app ──
 FROM base AS build
+# git + ca-certificates to clone the private antifraud impl over HTTPS below.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Pull the private anti-fraud implementation straight into the web app source,
+# replacing the permissive stub the public repo ships. Unlike the private
+# providers (loaded by the router at runtime), this code is COMPILED INTO the
+# Next.js build, so the clone must happen here in the build stage, after
+# `COPY . .`, and before `bun run build`.
+#
+# The token is a read-only GH token (Space secret), mounted only for this layer
+# and never persisted. It keeps the private source out of BOTH the Space repo
+# and the build context — the Space can be public without exposing it.
+# ANTIFRAUD_REPO defaults to the known repo; override via build arg.
+ARG ANTIFRAUD_REPO=TTS-AGI/Antifraud
+# Cache-buster: the `git clone` below is a fixed command, so Docker would reuse
+# a stale layer and keep an OLD snapshot of the private repo forever (new
+# detection never appears). The deploy passes the private repo's current HEAD
+# SHA here; when it changes, this layer's cache key changes and the clone
+# re-runs. Defaults to "main" for local builds.
+ARG ANTIFRAUD_REF=main
+RUN --mount=type=secret,id=ANTIFRAUD_TOKEN,mode=0444,required=false \
+    echo "antifraud ref: ${ANTIFRAUD_REF}"; \
+    if [ -s /run/secrets/ANTIFRAUD_TOKEN ]; then \
+      tok="$(cat /run/secrets/ANTIFRAUD_TOKEN)"; \
+      rm -rf apps/web/src/server/antifraud/impl; \
+      git clone --depth 1 \
+        "https://x-access-token:${tok}@github.com/${ANTIFRAUD_REPO}.git" \
+        apps/web/src/server/antifraud/impl \
+      && rm -rf apps/web/src/server/antifraud/impl/.git \
+      && echo "cloned private antifraud impl into the web app" \
+      || { echo "ERROR: token present but antifraud clone failed" >&2; exit 1; }; \
+    else \
+      echo "no ANTIFRAUD_TOKEN secret; building with the public stub (UNDEFENDED)"; \
+    fi
+
 RUN cd apps/web && bun run build
 
 # ── runtime ──
