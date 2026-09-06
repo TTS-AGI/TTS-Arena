@@ -13,7 +13,7 @@ set -euo pipefail
 DIR="apps/web/src/server/antifraud/impl"
 MARKER="@antifraud-stub"
 MAX_LINES=40 # a stub file is ~12 lines; the real impl is hundreds
-ALLOWED="assess.ts config.ts sweep.ts README.md"
+ALLOWED="assess.ts config.ts sweep.ts collector.ts ingest.ts README.md"
 
 fail=0
 note() {
@@ -35,7 +35,7 @@ for path in "$DIR"/*; do
   esac
 done
 
-for name in assess.ts config.ts sweep.ts; do
+for name in assess.ts config.ts sweep.ts collector.ts ingest.ts; do
   path="$DIR/$name"
   [ -f "$path" ] || {
     note "$path" "missing stub file"

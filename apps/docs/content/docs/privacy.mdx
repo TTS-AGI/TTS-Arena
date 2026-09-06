@@ -22,7 +22,12 @@ quarantined) and is not used for anything else.
 - your IP address, browser user-agent, and a device fingerprint, on sign-in and
   with each vote;
 - session events - battles started, whether they were voted on or abandoned,
-  generation timings and errors.
+  generation timings and errors;
+- technical characteristics of your browser and device - things like screen and
+  timezone settings, language, rendering and audio characteristics, and similar
+  signals - collected by a small script while you use the arena. We store these
+  as they're reported so we can tell real, varied listeners apart from many
+  votes coming from one place dressed up to look like many.
 
 A **captcha** may run once per browser. It stores a short-lived token and
 nothing about you.

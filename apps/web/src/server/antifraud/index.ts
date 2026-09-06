@@ -11,4 +11,13 @@
 export { assessVote } from "./impl/assess";
 export { SECURITY } from "./impl/config";
 export { runSecuritySweep } from "./impl/sweep";
-export type { Assessment, AssessParams, Severity } from "./types";
+export { collectorScript } from "./impl/collector";
+export { ingestReport } from "./impl/ingest";
+export type {
+  Assessment,
+  AssessParams,
+  CollectorScript,
+  IngestParams,
+  IngestResult,
+  Severity,
+} from "./types";
