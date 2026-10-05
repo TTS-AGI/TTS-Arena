@@ -11,11 +11,14 @@
  *
  * Gradium serves whichever model is their current default; we send no
  * `model_name`, so the model behind this endpoint changes when they ship. It
- * changed on 2026.08.31, which silently redefined what the old `gradium` arena
- * entry was serving. Because a rating only means something if the thing being
- * rated holds still, the pre-2026.08 entry is retired (kept on the board with
- * the rating it earned, but no longer drawn into battles) and the new model
- * competes as its own entry from zero.
+ * has changed twice: on 2026.08.31 (which silently redefined the original
+ * `gradium` entry), and again in 2026.10 — an expressivity update Gradium
+ * flagged, confirmed to be served under the same default endpoint (no new
+ * identifier). Because a rating only means something if the thing being rated
+ * holds still, each superseded entry is retired (kept on the board with the
+ * rating it earned, but no longer drawn into battles) and the current model
+ * competes as its own entry from zero. So far: `gradium` (pre-2026.08) and
+ * `gradium-tts-202608` are retired; `gradium-tts-202610` is live.
  *
  * Their docs list `model_name` as an optional REST body field (default
  * "default"), which would let us pin and stop this recurring — but it is absent
@@ -46,14 +49,18 @@ const ENDPOINT = "https://api.gradium.ai/api/post/speech/tts";
 const ICON = "/logos/gradium.webp";
 
 /**
- * The model live since their 2026.08.31 release. Gradium has not published an
- * identifier for it (their dropdown offers only "default"), so this slug is
- * ours, named after the release date in their own `gradium-tts-YYYYMM` style.
+ * The model live since Gradium's 2026.10 expressivity update. Gradium has not
+ * published an identifier for it (their dropdown offers only "default"), so this
+ * slug is ours, named after the release in their own `gradium-tts-YYYYMM` style.
  */
-const MODEL_ID = "gradium-tts-202608";
+const MODEL_ID = "gradium-tts-202610";
 
-/** The arena id of the retired pre-2026.08 entry. Kept for its rating history. */
-const LEGACY_MODEL_ID = "gradium";
+/**
+ * Arena ids of the retired entries, each superseded by a silent default swap.
+ * Kept registered for their rating history; the default endpoint no longer
+ * serves them, so the router won't offer them and synthesize() rejects them.
+ */
+const RETIRED_MODEL_IDS = ["gradium", "gradium-tts-202608"] as const;
 
 /** Gradium's recommended English voices for this model (3 female, 3 male). */
 const VOICES = [
@@ -74,7 +81,7 @@ export const gradium: TTSProvider = {
   name: "Gradium",
   isAvailable: () => key() !== undefined,
   listModels: (): ProviderModel[] => [
-    { id: MODEL_ID, name: "Gradium TTS 2026.08" },
+    { id: MODEL_ID, name: "Gradium TTS 2026.10" },
   ],
   async synthesize(input: SynthesizeInput): Promise<SynthesizeResult> {
     const k = key();
@@ -84,14 +91,15 @@ export const gradium: TTSProvider = {
         "not_configured",
       );
     }
-    // The retired entry is disabled, so the router should never ask for it —
-    // but reject it explicitly rather than silently serving the current model
-    // under the old model's name.
+    // The retired entries are disabled, so the router should never ask for one —
+    // but reject explicitly rather than silently serving the current model under
+    // an old model's name.
     const model = input.model ?? MODEL_ID;
     if (model !== MODEL_ID) {
+      const retired = (RETIRED_MODEL_IDS as readonly string[]).includes(model);
       throw new ProviderError(
-        model === LEGACY_MODEL_ID
-          ? `Gradium: "${LEGACY_MODEL_ID}" is retired — Gradium replaced it upstream on 2026.08.31 and it can no longer be served`
+        retired
+          ? `Gradium: "${model}" is retired — Gradium replaced it upstream with a new default and it can no longer be served`
           : `Gradium: unknown model "${model}"`,
         "unknown_model",
       );
@@ -148,7 +156,7 @@ registerProvider(gradium);
 registerArenaModels([
   {
     id: MODEL_ID,
-    name: "Gradium TTS 2026.08",
+    name: "Gradium TTS 2026.10",
     url: "https://gradium.ai/",
     icon: ICON,
     open: false,
@@ -157,18 +165,32 @@ registerArenaModels([
     enabled: true,
   },
   {
+    // Retired: Gradium's 2026.10 expressivity update replaced the default model
+    // underneath this entry, so its rating describes a model that is no longer
+    // reachable. Disabled (the router won't offer it) but still registered, so
+    // the leaderboard keeps showing what it earned.
+    id: "gradium-tts-202608",
+    name: "Gradium TTS 2026.08",
+    url: "https://gradium.ai/",
+    icon: ICON,
+    open: false,
+    provider: "gradium",
+    routerModel: "gradium-tts-202608",
+    enabled: false,
+  },
+  {
     // Retired: Gradium swapped their default model underneath this entry on
     // 2026.08.31, so its rating describes a model that is no longer reachable.
     // Disabled (the router won't offer it) but still registered, so the seed
     // keeps refreshing its name and the leaderboard keeps showing what it
     // earned. The id is permanent — votes key on it — so only the name moves.
-    id: LEGACY_MODEL_ID,
+    id: "gradium",
     name: "Gradium TTS (pre-2026.08)",
     url: "https://gradium.ai/",
     icon: ICON,
     open: false,
     provider: "gradium",
-    routerModel: LEGACY_MODEL_ID,
+    routerModel: "gradium",
     enabled: false,
   },
 ]);
