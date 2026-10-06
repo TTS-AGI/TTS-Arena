@@ -16,6 +16,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   serial,
   text,
@@ -313,6 +314,47 @@ export const securityEvents = pgTable(
   }),
 );
 
+/* ── Signal reports (raw client telemetry, for anti-fraud) ────────────── */
+/**
+ * One row per client collection run. The *storage* is public infrastructure;
+ * what gets collected, how it is weighted, and which probes run when all live
+ * in the private anti-fraud repo, so the column names here stay deliberately
+ * generic.
+ *
+ * Rows are append-only: a client's values drifting over time is itself a
+ * signal, so nothing here is updated in place or deduplicated.
+ */
+export const signalReports = pgTable(
+  "signal_reports",
+  {
+    id: serial("id").primaryKey(),
+    /** Null for a collection that ran before sign-in. */
+    userId: integer("user_id").references(() => users.id),
+    /** Battle session this collection belongs to, when it ran during one. */
+    sessionId: text("session_id"),
+    /** Opaque id of the probe set the backend issued for this run. */
+    setId: text("set_id"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    /** Stable client hash derived from the report; joins user_logins.fingerprint. */
+    fingerprint: text("fingerprint"),
+    /** Raw per-probe values, exactly as collected. Opaque JSON. */
+    components: jsonb("components").$type<Record<string, unknown>>(),
+    /** Request headers kept for the same run (client hints, accept-language, …). */
+    headers: jsonb("headers").$type<Record<string, string>>(),
+    /** Collection metadata: per-probe timings, probe errors, collector build. */
+    meta: jsonb("meta").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byUser: index("signal_reports_user_idx").on(t.userId),
+    byTime: index("signal_reports_time_idx").on(t.createdAt),
+    byFingerprint: index("signal_reports_fingerprint_idx").on(t.fingerprint),
+    byIp: index("signal_reports_ip_idx").on(t.ip),
+    bySession: index("signal_reports_session_idx").on(t.sessionId),
+  }),
+);
+
 /* ── Error events (observability — every caught error, persisted) ─────── */
 export const errorEvents = pgTable(
   "error_events",
@@ -487,6 +529,7 @@ export type ModelRow = typeof models.$inferSelect;
 export type VoteRow = typeof votes.$inferSelect;
 export type VoiceStatRow = typeof voiceStats.$inferSelect;
 export type SecurityEventRow = typeof securityEvents.$inferSelect;
+export type SignalReportRow = typeof signalReports.$inferSelect;
 export type ErrorEventRow = typeof errorEvents.$inferSelect;
 export type GenerationEventRow = typeof generationEvents.$inferSelect;
 export type TestRunRow = typeof testRuns.$inferSelect;

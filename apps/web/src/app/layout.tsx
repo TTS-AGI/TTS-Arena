@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { ClientSignals } from "@/components/client-signals";
 
 const hanken = Hanken_Grotesk({
   subsets: ["latin"],
@@ -42,7 +43,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ClientSignals />
+      </body>
     </html>
   );
 }

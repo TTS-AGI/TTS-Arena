@@ -50,6 +50,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           PRIVATE_PROVIDERS_TOKEN: ${{ secrets.PRIVATE_PROVIDERS_TOKEN }}
+          ANTIFRAUD_TOKEN: ${{ secrets.ANTIFRAUD_TOKEN }}
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
@@ -98,6 +99,32 @@ jobs:
             STAMP="$(date -u +%Y%m%d%H%M%S)"
             sed -i "s|^ARG PRIVATE_PROVIDERS_REF=.*|ARG PRIVATE_PROVIDERS_REF=ts-${STAMP}|" /tmp/space/Dockerfile
             echo "WARNING: could not resolve private HEAD; busting cache with timestamp ts-${STAMP}" >&2
+          fi
+
+          # Same cache-bust for the private ANTIFRAUD clone layer (see the
+          # Dockerfile build stage). Without it the Space keeps an OLD snapshot
+          # of the detection logic forever. Stamp the antifraud repo's HEAD SHA
+          # into ARG ANTIFRAUD_REF.
+          AF_REPO="$(sed -n 's/^ARG ANTIFRAUD_REPO=//p' /tmp/space/Dockerfile | head -1)"
+          AF_REPO="${AF_REPO:-TTS-AGI/Antifraud}"
+          if [ -z "${ANTIFRAUD_TOKEN:-}" ]; then
+            echo "note: ANTIFRAUD_TOKEN not available to this job"
+          fi
+          AF_REF="$(curl -sf \
+            -H "Authorization: Bearer ${ANTIFRAUD_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${AF_REPO}/commits/HEAD" \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["sha"])' 2>/dev/null || true)"
+          if [ -z "$AF_REF" ]; then
+            AF_REF="$(git ls-remote "https://x-access-token:${ANTIFRAUD_TOKEN}@github.com/${AF_REPO}.git" HEAD 2>/dev/null | cut -f1)"
+          fi
+          if [ -n "$AF_REF" ]; then
+            sed -i "s|^ARG ANTIFRAUD_REF=.*|ARG ANTIFRAUD_REF=${AF_REF}|" /tmp/space/Dockerfile
+            echo "pinned antifraud ref to ${AF_REF:0:7}"
+          else
+            STAMP="$(date -u +%Y%m%d%H%M%S)"
+            sed -i "s|^ARG ANTIFRAUD_REF=.*|ARG ANTIFRAUD_REF=ts-${STAMP}|" /tmp/space/Dockerfile
+            echo "WARNING: could not resolve antifraud HEAD; busting cache with timestamp ts-${STAMP}" >&2
           fi
 
           # Deploy as a single fresh commit (orphan history). This keeps the

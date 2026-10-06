@@ -25,6 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Fail fast if the private anti-fraud implementation was committed over
+      # the public stub. Runs before install so a leak never reaches a build log.
+      - name: Anti-fraud stub guard
+        run: bash .github/scripts/check-antifraud-stub.sh
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
