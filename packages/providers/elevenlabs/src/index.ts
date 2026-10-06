@@ -144,6 +144,16 @@ const ICON = "/logos/elevenlabs.svg";
 
 registerArenaModels([
   {
+    id: "eleven-v4",
+    name: "Eleven v4",
+    url: "https://elevenlabs.io/",
+    icon: ICON,
+    open: false,
+    provider: "elevenlabs",
+    routerModel: "eleven_v4",
+    enabled: true,
+  },
+  {
     id: "eleven-v3",
     name: "Eleven v3",
     url: "https://elevenlabs.io/",
