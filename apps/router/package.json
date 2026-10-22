@@ -12,6 +12,7 @@
     "lint": "echo 'no lint (covered by root prettier)'"
   },
   "dependencies": {
+    "@ttsa/provider-audio8": "workspace:*",
     "@ttsa/provider-cartesia": "workspace:*",
     "@ttsa/provider-chatterbox": "workspace:*",
     "@ttsa/provider-deepdub": "workspace:*",

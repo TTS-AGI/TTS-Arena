@@ -22,6 +22,7 @@
     "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-table": "^8.21.3",
+    "@ttsa/provider-audio8": "workspace:*",
     "@ttsa/provider-cartesia": "workspace:*",
     "@ttsa/provider-chatterbox": "workspace:*",
     "@ttsa/provider-deepdub": "workspace:*",

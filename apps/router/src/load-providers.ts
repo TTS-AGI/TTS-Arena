@@ -9,6 +9,7 @@
 import { env } from "@ttsa/provider-sdk";
 
 // Public, in-repo providers — registered via import side effect.
+import "@ttsa/provider-audio8";
 import "@ttsa/provider-elevenlabs";
 import "@ttsa/provider-minimax";
 import "@ttsa/provider-cartesia";

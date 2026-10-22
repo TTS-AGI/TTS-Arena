@@ -20,6 +20,7 @@ import { allArenaModels } from "@ttsa/provider-sdk";
 // isn't currently serveable (no API key on this deploy). Icons therefore show
 // up after deploy without waiting for a battle. Private providers aren't bundled
 // here; their metadata is refreshed from the router catalog at generate time.
+import "@ttsa/provider-audio8";
 import "@ttsa/provider-elevenlabs";
 import "@ttsa/provider-minimax";
 import "@ttsa/provider-cartesia";
