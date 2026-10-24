@@ -39,6 +39,7 @@ import "@ttsa/provider-hithink";
 import "@ttsa/provider-rumik";
 import "@ttsa/provider-luna";
 import "@ttsa/provider-fluxions";
+import "@ttsa/provider-venus";
 import { db } from "./client";
 import { models } from "./schema";
 
