@@ -42,7 +42,6 @@ export function Leaderboard() {
     data: rows,
     isPending,
     isError,
-    isFetching,
   } = useQuery({
     queryKey: leaderboardKey(variant),
     queryFn: () => fetchLeaderboard(variant),
@@ -83,15 +82,8 @@ export function Leaderboard() {
           Ratings from blind pairwise votes. Ratings settle as the votes pile
           up; newer models join once they’ve earned enough.
         </p>
-        {/* Scale of the thing, in the mono micro-label. The dot pulses while a
-            refresh is in flight — the only "loading" cue once rows are up. */}
-        <p className="tag mt-3 flex items-center justify-center gap-2">
-          <span
-            aria-hidden
-            className={`h-1.5 w-1.5 rounded-full bg-accent transition-opacity ${
-              isFetching ? "animate-pulse opacity-100" : "opacity-25"
-            }`}
-          />
+        {/* Scale of the thing, in the mono micro-label. */}
+        <p className="tag mt-3 text-center">
           {tally
             ? `${tally.models} models · ${fmtVotes(tally.votes)} votes cast`
             : " "}
