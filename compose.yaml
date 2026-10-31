@@ -16,7 +16,7 @@ name: tts-arena
 services:
   # One-shot: apply migrations and seed the model registry, then exit.
   migrate:
-    image: oven/bun:1.1.42
+    image: oven/bun:1.4.0
     working_dir: /app
     environment:
       SQLITE_PATH: /data/tts_arena.db
@@ -32,7 +32,7 @@ services:
              bun run src/server/db/seed.ts"
 
   router:
-    image: oven/bun:1.1.42
+    image: oven/bun:1.4.0
     working_dir: /app
     restart: unless-stopped
     env_file:
@@ -51,7 +51,7 @@ services:
              bun --watch apps/router/src/index.ts"
 
   web:
-    image: oven/bun:1.1.42
+    image: oven/bun:1.4.0
     working_dir: /app
     restart: unless-stopped
     depends_on:

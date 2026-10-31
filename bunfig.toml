@@ -1,0 +1,7 @@
+[install]
+# Keep the flat (hoisted) node_modules layout bun 1.1 produced. Bun >= 1.3
+# defaults workspaces to the isolated linker, which puts each app's deps (and
+# bins like `next`) under apps/*/node_modules; Dockerfile.space copies only the
+# root node_modules between stages and relies on the hoisted
+# node_modules/@ttsa-private/providers workspace link.
+linker = "hoisted"

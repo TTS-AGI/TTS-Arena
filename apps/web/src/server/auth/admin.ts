@@ -8,8 +8,7 @@ import { isAdmin } from "../env";
 import { currentUser } from "./user";
 
 export type AdminGuard =
-  | { ok: true; user: UserRow }
-  | { ok: false; status: 401 | 403 };
+  { ok: true; user: UserRow } | { ok: false; status: 401 | 403 };
 
 /** Resolve the current admin, or a reason it was denied. */
 export async function requireAdmin(): Promise<AdminGuard> {

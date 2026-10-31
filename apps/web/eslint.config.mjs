@@ -1,18 +1,23 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+import prettier from "eslint-config-prettier/flat";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
+// Next 16 removed `next lint`; eslint-config-next now ships native flat configs.
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextVitals,
+  ...nextTs,
   // Must come last: disables ESLint rules that conflict with Prettier.
-  ...compat.extends("prettier"),
+  prettier,
+  {
+    rules: {
+      // New in eslint-plugin-react-hooks 7. The flagged spots read client-only
+      // state (localStorage/session) after hydration, which is intentional.
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
+  {
+    ignores: [".next/**", "node_modules/**", "next-env.d.ts", "drizzle/**"],
+  },
 ];
 
 export default eslintConfig;

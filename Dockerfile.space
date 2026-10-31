@@ -7,7 +7,7 @@
 #
 # The database is Postgres on a VPS (DATABASE_URL secret, over a Cloudflare
 # tunnel). Generated audio is logged to /audio (a persistent bucket).
-FROM oven/bun:1.1.42-debian AS base
+FROM oven/bun:1.4.0-debian AS base
 WORKDIR /app
 
 # ── deps ──
@@ -18,7 +18,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
        git ca-certificates python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
-COPY package.json bun.lock ./
+# bunfig.toml pins the hoisted linker, so every bin and workspace link lands in
+# the root node_modules that the later stages copy.
+COPY package.json bun.lock bunfig.toml ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/router/package.json apps/router/package.json
 # Copy every workspace manifest (providers grow over time, so copy the tree's
@@ -81,6 +83,14 @@ RUN apt-get update \
        supervisor ffmpeg ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
+# Unprivileged runtime user. HF Spaces expect uid 1000, and the oven/bun base
+# image already ships a uid-1000 "bun" user, so rename it to "app" (uid/gid
+# 1000, home /home/app). The app processes (router, web, migrations) run as
+# this user; the app code itself stays root-owned and read-only to it.
+RUN groupmod -n app bun \
+  && usermod -l app -d /home/app -m bun \
+  && test "$(id -u app)" = 1000
+
 # App: built web + full source for the router (run from source via bun).
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/apps/web/.next/standalone ./standalone
@@ -108,8 +118,19 @@ COPY deploy/space/entrypoint.sh /entrypoint.sh
 COPY deploy/space/supervisord.conf /etc/supervisor/conf.d/tts-arena.conf
 RUN chmod +x /entrypoint.sh
 
-# HF mounts /data and /audio as persistent buckets; create mountpoints.
-RUN mkdir -p /data /audio
+# HF mounts /data and /audio as persistent buckets; create mountpoints. Only
+# the dirs the app writes to are owned by `app`: the bucket mountpoints (the
+# entrypoint re-chowns /audio at start, since the mount may be root-owned),
+# the web app's on-disk audio cache, and Next's runtime cache.
+ENV AUDIO_CACHE_DIR=/app/var/audio-cache
+RUN mkdir -p /data /audio /app/var/audio-cache /app/var/audio-log \
+       /app/standalone/apps/web/.next/cache \
+  && chown app:app /data /audio /app/var /app/var/audio-cache \
+       /app/var/audio-log /app/standalone/apps/web/.next/cache
 
 EXPOSE 7860
+# No USER directive on purpose: the entrypoint starts as root only to fix
+# ownership of the /audio bucket mount, then runs migrations and every app
+# process as `app` (see deploy/space/entrypoint.sh + supervisord.conf). It also
+# works when the platform starts the container as uid 1000 directly.
 ENTRYPOINT ["/entrypoint.sh"]

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Sync deployment secrets onto the HF Space via the Hub API. Only non-empty
 # values are pushed, and secrets already set on the Space are skipped (to avoid
-# HF's 429 rate limit). Provider names are NOT hardcoded here: the full set of
-# repo secrets arrives as a JSON blob in $ALL_SECRETS (GitHub's
-# toJSON(secrets)), and everything except an infra-only exclude-list is synced.
+# HF's 429 rate limit). The secrets to sync arrive as a JSON blob in
+# $ALL_SECRETS. The deploy workflow builds that blob from an explicit allowlist
+# of named secrets (never toJSON(secrets)); an infra-only exclude-list below is
+# kept as a second line of defense.
 #
 # Requires HF_TOKEN (write) and ALL_SECRETS (JSON) in the environment.
 #
@@ -115,18 +116,19 @@ set_secret() {
 
 echo "[set-secrets] syncing secrets to ${REPO}"
 
-# Sync every GitHub repo secret to the Space, EXCEPT infra-only ones that must
-# not leak into the Space's runtime. Provider names (public or private) are NOT
-# enumerated here, so this public script reveals nothing about which providers
-# exist — new providers are picked up automatically by adding a repo secret.
+# Sync every key in $ALL_SECRETS to the Space, EXCEPT infra-only ones that must
+# never reach the Space's runtime even if they slip into the blob. The blob is
+# built by .github/workflows/deploy-space.yml from its SPACE_SECRET__* allowlist
+# plus the optional EXTRA_SPACE_SECRETS_JSON repo secret (private-provider
+# credentials, kept out of the public workflow by name). A new provider needs
+# its secret added to that allowlist (or to EXTRA_SPACE_SECRETS_JSON).
 #
-# Secrets arrive as one JSON blob in $ALL_SECRETS (GitHub's toJSON(secrets)).
 # Keys are read with python; values are passed via env to set_secret so they're
 # never interpolated into the command line.
 # Note: PRIVATE_PROVIDERS_TOKEN IS synced — the Space's Docker build mounts it
 # as a build secret (RUN --mount=type=secret,id=PRIVATE_PROVIDERS_TOKEN) to
 # clone the private providers. HF_TOKEN/github_token stay out (deploy infra).
-EXCLUDE_RE='^(github_token|HF_TOKEN|PRIVATE_PROVIDERS_REPO|SYNC_SECRETS_FORCE)$'
+EXCLUDE_RE='^(github_token|GITHUB_TOKEN|HF_TOKEN|PRIVATE_PROVIDERS_REPO|SYNC_SECRETS_FORCE|EXTRA_SPACE_SECRETS_JSON)$'
 
 if [ -z "${ALL_SECRETS:-}" ]; then
   echo "[set-secrets] ALL_SECRETS is empty; nothing to sync" >&2

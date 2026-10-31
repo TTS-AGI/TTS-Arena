@@ -5,7 +5,7 @@
 # it in isolation, NOT as part of the monorepo workspace. That avoids pulling in
 # unrelated packages (e.g. web's native better-sqlite3) that would need a build
 # toolchain and have nothing to do with the docs.
-FROM oven/bun:1.1.42-debian AS base
+FROM oven/bun:1.4.0-debian AS base
 WORKDIR /app/docs
 
 # ── deps ──

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Production image for the TTS router. Built from the monorepo root context.
 # ffmpeg is included for the audio peak-normalization step.
-FROM oven/bun:1.1.42 AS base
+FROM oven/bun:1.4.0 AS base
 WORKDIR /app
 
 FROM base AS deps

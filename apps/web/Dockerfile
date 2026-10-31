@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Production image for the web app (Next.js standalone). Built from the
 # monorepo root context so workspace packages resolve.
-FROM oven/bun:1.1.42 AS base
+FROM oven/bun:1.4.0 AS base
 WORKDIR /app
 
 # ── deps: install the whole workspace (cached on manifests) ──

@@ -25,24 +25,100 @@ jobs:
   deploy:
     name: Sync to Space
     runs-on: ubuntu-latest
-    # Only deploy when the triggering CI run succeeded (or on manual dispatch).
+    # Only deploy on manual dispatch, or when CI succeeded for a push to this
+    # repo (never for a fork's or a pull request's CI run).
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           lfs: true # pull the prompt corpus content, not just LFS pointers
 
       - name: Sync deployment secrets to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          # Pass ALL repo secrets as one JSON blob so provider names (public or
-          # private) never appear in this public workflow. set-secrets.sh syncs
-          # every key to the Space except the infra-only ones it excludes.
-          ALL_SECRETS: ${{ toJSON(secrets) }}
+          # Explicit allowlist: only the secrets the Space runtime (web, router,
+          # providers) or its Docker build actually reads. Every SPACE_SECRET__X
+          # entry below is synced to the Space as X; unset/empty ones are
+          # skipped. Never pass toJSON(secrets) here — it would ship every repo
+          # secret (deploy tokens included) to the Space.
+          # App core
+          SPACE_SECRET__DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SPACE_SECRET__SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          SPACE_SECRET__ADMIN_USERS: ${{ secrets.ADMIN_USERS }}
+          SPACE_SECRET__ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
+          SPACE_SECRET__HCAPTCHA_SECRET: ${{ secrets.HCAPTCHA_SECRET }}
+          SPACE_SECRET__HF_OAUTH_CLIENT_ID: ${{ secrets.HF_OAUTH_CLIENT_ID }}
+          SPACE_SECRET__HF_OAUTH_CLIENT_SECRET: ${{ secrets.HF_OAUTH_CLIENT_SECRET }}
+          SPACE_SECRET__APP_URL: ${{ secrets.APP_URL }}
+          SPACE_SECRET__SECURITY_DISABLED: ${{ secrets.SECURITY_DISABLED }}
+          SPACE_SECRET__PGSSL_NO_VERIFY: ${{ secrets.PGSSL_NO_VERIFY }}
+          SPACE_SECRET__DB_POOL_MAX: ${{ secrets.DB_POOL_MAX }}
+          SPACE_SECRET__ERROR_RETENTION_DAYS: ${{ secrets.ERROR_RETENTION_DAYS }}
+          SPACE_SECRET__GENERATION_RETENTION_DAYS: ${{ secrets.GENERATION_RETENTION_DAYS }}
+          # Private providers: plugin list + the build secret the Space's Docker
+          # build mounts to clone them.
+          SPACE_SECRET__PROVIDER_PLUGINS: ${{ secrets.PROVIDER_PLUGINS }}
+          SPACE_SECRET__PRIVATE_PROVIDERS_TOKEN: ${{ secrets.PRIVATE_PROVIDERS_TOKEN }}
+          # Public provider credentials (packages/providers/*)
+          SPACE_SECRET__AUDIO8_ENDPOINT_URL: ${{ secrets.AUDIO8_ENDPOINT_URL }}
+          SPACE_SECRET__AUDIO8_HF_TOKEN: ${{ secrets.AUDIO8_HF_TOKEN }}
+          SPACE_SECRET__AUDIO8_SERVICE_KEY: ${{ secrets.AUDIO8_SERVICE_KEY }}
+          SPACE_SECRET__CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
+          SPACE_SECRET__CHATTERBOX_API_KEY: ${{ secrets.CHATTERBOX_API_KEY }}
+          SPACE_SECRET__DEEPDUB_API_KEY: ${{ secrets.DEEPDUB_API_KEY }}
+          SPACE_SECRET__ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          SPACE_SECRET__FLUXIONS_API_KEY: ${{ secrets.FLUXIONS_API_KEY }}
+          SPACE_SECRET__GRADIUM_API_KEY: ${{ secrets.GRADIUM_API_KEY }}
+          SPACE_SECRET__HITHINK_API_URL: ${{ secrets.HITHINK_API_URL }}
+          SPACE_SECRET__HUME_API_KEY: ${{ secrets.HUME_API_KEY }}
+          SPACE_SECRET__INWORLD_API_KEY: ${{ secrets.INWORLD_API_KEY }}
+          SPACE_SECRET__MARS_API_KEY: ${{ secrets.MARS_API_KEY }}
+          SPACE_SECRET__MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          SPACE_SECRET__MINIMAX_GROUP_ID: ${{ secrets.MINIMAX_GROUP_ID }}
+          SPACE_SECRET__RUMIK_API_KEY: ${{ secrets.RUMIK_API_KEY }}
+          SPACE_SECRET__SMALLEST_API_KEY: ${{ secrets.SMALLEST_API_KEY }}
+          SPACE_SECRET__TONTAUBE_API_KEY: ${{ secrets.TONTAUBE_API_KEY }}
+          SPACE_SECRET__TYPECAST_API_KEY: ${{ secrets.TYPECAST_API_KEY }}
+          SPACE_SECRET__UNI_API_KEY: ${{ secrets.UNI_API_KEY }}
+          SPACE_SECRET__UNI_BASE_URL: ${{ secrets.UNI_BASE_URL }}
+          SPACE_SECRET__VENUS_API_KEY: ${{ secrets.VENUS_API_KEY }}
+          SPACE_SECRET__VENUS_BASE_URL: ${{ secrets.VENUS_BASE_URL }}
+          SPACE_SECRET__VOICEAI_API_KEY: ${{ secrets.VOICEAI_API_KEY }}
+          SPACE_SECRET__VUILABS_API_KEY: ${{ secrets.VUILABS_API_KEY }}
+          # Private-provider credentials, as ONE repo secret holding a JSON
+          # object ({"NAME":"value",...}), so their names stay out of this
+          # public file. Optional; merged under the named secrets above.
+          EXTRA_SPACE_SECRETS_JSON: ${{ secrets.EXTRA_SPACE_SECRETS_JSON }}
         run: |
+          # Build the JSON blob set-secrets.sh expects from the allowlist above.
+          # Values travel via env only (never argv or logs).
+          ALL_SECRETS="$(python3 - <<'PY'
+          import json, os, re, sys
+          out = {}
+          extra = os.environ.get("EXTRA_SPACE_SECRETS_JSON", "").strip()
+          if extra:
+              try:
+                  data = json.loads(extra)
+              except Exception:
+                  sys.exit("EXTRA_SPACE_SECRETS_JSON is not valid JSON")
+              if not isinstance(data, dict):
+                  sys.exit("EXTRA_SPACE_SECRETS_JSON must be a JSON object")
+              for k, v in data.items():
+                  if re.fullmatch(r"[A-Z][A-Z0-9_]*", str(k)) and isinstance(v, str):
+                      out[k] = v
+          prefix = "SPACE_SECRET__"
+          for k, v in os.environ.items():
+              if k.startswith(prefix) and v:
+                  out[k[len(prefix):]] = v
+          print(json.dumps(out))
+          PY
+          )"
+          export ALL_SECRETS
           chmod +x deploy/space/set-secrets.sh
           deploy/space/set-secrets.sh "${HF_OWNER}/${HF_SPACE}"
 
