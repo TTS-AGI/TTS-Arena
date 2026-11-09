@@ -1,0 +1,96 @@
+---
+title: Integrity decisions
+description: The public record of models suspended from TTS Arena for vote manipulation — what happened, the provider's response, and the outcome in each case.
+---
+
+TTS Arena ranks text-to-speech models through blind A/B voting: voters hear two clips and pick the better one, and the leaderboard is computed from those votes. Manipulated votes break that evaluation.
+
+This page is the public record of models suspended for vote manipulation. In every case below, the matter was put to the provider before a decision was made, and the outcome was the same: the manipulated votes were excluded, the leaderboard was recomputed from clean votes, and the model was suspended.
+
+Decisions are made under the [Provider Agreement](/provider-agreement). Providers may not vote on their own model, through staff or anyone acting for them (s4.1), or use any side channel, including the sound of their own model, to work out which clip is theirs (s4.2). Intent is not the test, and decisions are final (s9). A suspended model stays on the board, unranked, at the bottom, with the reason and date shown; the label has no expiry, and the model cannot be retracted, withdrawn, renamed, or resubmitted under another name (s8.3).
+
+## Suspended models
+
+| Model                        | Provider      | Suspended  | Accounts             | Votes excluded |
+| ---------------------------- | ------------- | ---------- | -------------------- | -------------- |
+| SwanTale (listed as "Venus") | SwanTale team | 2026-10-31 | 3                    | 170            |
+| Audio8-TTS-Realistic-0.6B    | Edge0         | 2026-10-30 | 11                   | 670            |
+| U2-TTS                       | Unisound      | 2026-09-05 | 5                    | 703            |
+| Vocu V3.0                    | Vocu          | 2026-07-03 | Provider-linked ring | ~4,900         |
+
+## Cases
+
+### SwanTale (stealth codename "Venus") — suspended 2026-10-31
+
+**Provider:** SwanTale team
+
+SwanTale was listed under the stealth codename "Venus" and is now displayed under its real name.
+
+- Between 2026-10-27 and 2026-10-28, three accounts cast 170 votes. The account names were the submitting group's own research project names, and the accounts were active in sequence with no overlap.
+- The three accounts saw Venus in 33 battles and picked Venus in all 33. Other voters picked Venus about 60% of the time.
+- The provider's first response: the accounts belonged to two different students and were not team-controlled.
+- After the evidence was shared, the provider's second response confirmed that a team member had organised the voting, that two colleagues had voted through the group's shared project accounts, and that a VPN/proxy had been used. The provider accepted the suspension.
+
+From the provider's response:
+
+> "I sincerely apologize for encouraging and coordinating votes in support of Venus."
+
+> "I acknowledge that we also deliberately took turns to make the coordinated activity less conspicuous. This was inappropriate, and I deeply regret it."
+
+**Outcome.** The 170 votes were excluded, SwanTale's rating was recomputed from 1722 to approximately 1508, and the model was suspended.
+
+### Audio8-TTS-Realistic-0.6B — suspended 2026-10-30
+
+**Provider:** Edge0
+
+- Audio8-TTS-Realistic-0.6B was listed on 2026-10-23. Starting on listing day, eleven accounts — Edge0 staff and company-linked accounts — cast 670 votes.
+- These accounts saw Audio8 in 149 battles and picked it 121 times (81%). Other voters picked Audio8 57% of the time.
+- The provider confirmed the accounts and the activity, describing an office group session of roughly an hour in which colleagues were invited to listen after Audio8 wins and so became familiar with its voices. Per the provider, the activity stopped once the rating rose sharply, and the team had been unaware of the affiliated-voting ban.
+- The voting records show activity from 02:08 to 11:50 UTC on 2026-10-23 — roughly ten hours — and one of the accounts voted again on 2026-10-26 and 2026-10-27.
+- Recognising the model's own voice and picking it is un-blinding under s4.2; under s9, intent is not the test.
+
+From the provider's response:
+
+> "The account connections and voting activity you described are real: I participated myself"
+
+**Outcome.** The provider agreed to the exclusion of the votes and asked for the suspension and label to be lifted; the request was declined. The 670 votes were excluded, the rating was recomputed from approximately 1690 to approximately 1590, and the model's clean battle count fell from 182 to 47. The model was suspended.
+
+### U2-TTS — suspended 2026-09-05
+
+**Provider:** Unisound
+
+- Between 2026-08-21 and 2026-09-04, five accounts cast 703 votes. Per the provider, two of the accounts were company test accounts and one was an employee's personal account.
+- The five accounts voted almost only when U2-TTS appeared in a battle and abandoned most other battles. Voters generally vote at the same rate whether or not a given model appears.
+- The accounts covered 295 of the model's 452 battles. On 2026-08-31 — the day U2-TTS passed 300 votes, the threshold at which the Preliminary label is removed — they covered 265 of 321.
+- Outside voters picked U2-TTS in 54% of battles (85 of 157); the employee account picked it in 93% (38 of 41). The model's listed win rate was 63%.
+- On a call, the provider said the voters had recognised U2-TTS by its voice and picked it when outputs sounded similar, and that the vote count had been watched with the goal of passing 300 votes to drop the Preliminary label. The provider said it had been unaware that this counted as manipulation.
+
+The provider, describing the voting pattern:
+
+> "we didn't want to spend too much time listening and waiting for the voting buttons to appear just to cast votes, when we did not hear our system sound (i.e, there is no our model in A/B test), because that would have significantly increased our time cost and slowed down our overall evaluation process."
+
+The provider asked, in order, for: the votes to be excluded and the model relisted; the model to be retracted and re-evaluated from scratch; the listing to be renamed; the model to be removed from the public board. All four requests were declined — under s8.3 a suspended model cannot be retracted, renamed, or resubmitted, and under s9 decisions are final.
+
+**Outcome.** The 703 votes were excluded, the board was recomputed, and the model was suspended. After this case, an explicit rule was added: provider staff may not vote on their own model.
+
+### Vocu V3.0 — suspended 2026-07-03
+
+**Provider:** Vocu
+
+- A ring of provider-linked accounts cast roughly 4,900 votes. The volume and regularity of the voting indicated automation, not listening.
+- When Vocu appeared in a battle, the ring's four main accounts picked it 99% of the time. Among 202 other voters, Vocu won 33% of the time.
+- The provider first denied owning a linked account. When shown that the account was registered to an email address belonging to the provider, the provider confirmed it and apologised.
+
+The provider's first reply:
+
+> "I actually don't even own that account..."
+
+And after being shown the registration:
+
+> "Yes, this is my email address. I apologize for my earlier moment of rashness in trying to justify our wrongdoing — it was deeply shameful of me."
+
+**Outcome.** The roughly 4,900 votes were excluded, the board was recomputed, and the model was suspended.
+
+## Reporting
+
+To report suspected vote manipulation or any other breach of the [Provider Agreement](/provider-agreement), use [Discord](https://discord.gg/HB8fMR6GTr) or [email](mailto:me@mrfake.name). All reports are reviewed.
