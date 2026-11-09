@@ -42,8 +42,11 @@ import {
  */
 const MODEL_ID = "venus";
 
-/** Codename shown to voters. */
-const DISPLAY_NAME = "Venus";
+/**
+ * Revealed name. Submitted under the codename "Venus"; revealed after the
+ * model was suspended for coordinated voting (see docs: integrity-decisions).
+ */
+const DISPLAY_NAME = "SwanTale";
 
 /** Vendor-fixed pool of voices. Arena does no zero-shot cloning. */
 const VOICES = ["v01", "v02", "v03", "v04", "v05", "v06"];
@@ -122,10 +125,9 @@ registerArenaModels([
   {
     id: MODEL_ID,
     name: DISPLAY_NAME,
-    // Stealth entries never render a link; keep this non-identifying.
-    url: "https://ttsarena.org",
-    // The ghost logo is what marks this row as a stealth/codenamed model.
-    icon: "/logos/stealth.webp",
+    url: "https://docs.ttsarena.org/integrity-decisions",
+    // Revealed: no longer the stealth ghost logo, so the stealth mark is gone.
+    icon: "/logos/default.webp",
     open: false,
     provider: "venus",
     routerModel: MODEL_ID,

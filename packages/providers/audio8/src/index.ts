@@ -9,6 +9,7 @@ registerArenaModels([
     id: "audio8-tts-realistic-0-6b",
     name: "Audio8-TTS-Realistic-0.6B",
     url: "https://huggingface.co/Edge0",
+    icon: "/logos/edge0.webp",
     // The submitted version is not yet publicly released. An earlier preview
     // is available; it is not the checkpoint served by this evaluation API.
     open: false,
